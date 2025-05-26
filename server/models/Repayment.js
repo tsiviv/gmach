@@ -10,11 +10,13 @@ const Repayment = sequelize.define('Repayment', {
   },
   loanId: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: Loan,
       key: 'id',
     },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
   },
   amount: {
     type: DataTypes.FLOAT,
@@ -32,6 +34,5 @@ const Repayment = sequelize.define('Repayment', {
   timestamps: false,
 });
 
-Repayment.belongsTo(Loan, { foreignKey: 'loanId' });
 
 module.exports = Repayment;

@@ -1,0 +1,13 @@
+.header{
+    background-color: var(--mustard-light); /* חרדל בהיר */
+    justify-content: space-around;
+    display: flex;
+}
+.name{
+    margin-right: 15%;
+    color: var(--text-dark);
+}
+.part2{
+    margin-right: 120;
+    gap: 10%;
+}

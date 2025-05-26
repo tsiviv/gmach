@@ -4,33 +4,34 @@ const People = require('./People');
 const Loan = require('./Loan');
 
 const Guarantor = sequelize.define('Guarantor', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  loanId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: Loan,
-      key: 'id',
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
     },
-  },
-  PeopleId: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    references: {
-      model: People,
-      key: 'id',
+    loanId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: Loan,
+            key: 'id',
+        },
     },
-  },
+    PeopleId: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        references: {
+            model: People,
+            key: 'id',
+        },
+    },
+    documentPath: {
+        type: DataTypes.STRING,
+        allowNull: true
+    }
 }, {
-  tableName: 'guarantors',
-  timestamps: false,
+    tableName: 'guarantors',
+    timestamps: false,
 });
-
-Guarantor.belongsTo(Loan, { foreignKey: 'loanId' });
-Guarantor.belongsTo(People, { foreignKey: 'PeopleId', as: 'guarantor' });
 
 module.exports = Guarantor;

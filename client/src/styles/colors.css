@@ -1,0 +1,13 @@
+:root {
+    --mustard-light: #f6e27f;
+    --mustard: #e1c542;
+    --mustard-dark: #c5a30c;
+    --mustard-brown: #a67c00;
+    --mustard-orange: #d4a017;
+  
+    /* צבעים נלווים */
+    --background: #fffdf3;
+    --text-dark: #a27e53;
+    --border-color: #d1b95c;
+  }
+  

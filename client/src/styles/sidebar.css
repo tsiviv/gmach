@@ -1,0 +1,46 @@
+.sidebar {
+  width: 220px;
+  background-color: var(--mustard-light); /* חרדל בהיר */
+  padding: 1rem;
+  height: 100%;
+ display: flex;
+ flex-direction: column;
+ gap: 10%;
+}
+.navside{
+  display: flex;
+  flex-direction: column;
+  height: 70vh;
+}
+.sidebar h5 {
+  margin-bottom: 1.5rem;
+  color: #8c6d1f; /* חרדל כהה */
+}
+
+.sidebar .nav-link {
+  display: flex;
+  /* align-items: center; */
+  justify-content: space-around;
+  padding: 10px 15px;
+  border-radius: 8px;
+  color: var(--mustard-orange);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+.p-icons{
+
+}
+
+.sidebar .nav-link:hover {
+  background-color: var(--background);
+}
+
+.sidebar .nav-link.active {
+  background-color: #d4b750;
+  color: white;
+}
+
+.sidebar .nav-link i {
+  margin-left: 10px;
+}

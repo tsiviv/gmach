@@ -24,17 +24,36 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.DATE,
     allowNull: false,
   },
-  dueDate: {
-    type: DataTypes.DATE,
-  },
   notes: {
     type: DataTypes.TEXT,
+    allowNull: true,
   },
+  status: {
+    type: DataTypes.ENUM('pending', 'partial', 'paid', 'overdue', 'late_paid'),
+    allowNull: false,
+    defaultValue: 'pending'
+  },
+  repaymentType: {
+    type: DataTypes.ENUM('once', 'monthly'),
+    allowNull: false,
+    defaultValue: 'once'
+  },
+  repaymentDay: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  singleRepaymentDate: {
+    type: DataTypes.DATE,
+    allowNull: true, 
+  },
+  documentPath: {
+  type: DataTypes.STRING,
+  allowNull: true
+}
+
 }, {
   tableName: 'loans',
   timestamps: false,
 });
-
-Loan.belongsTo(People, { foreignKey: 'borrowerId', as: 'borrower' });
 
 module.exports = Loan;
