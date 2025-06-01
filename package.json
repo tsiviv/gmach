@@ -1,0 +1,11 @@
+{
+  "name": "gmach",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"node server/api.js\" \"cd client && npm start\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}

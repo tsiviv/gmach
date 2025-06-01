@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
-import { CreateLoan, GetAllLoans, GetLoanById, DeleteLoan, UpdateLoan } from "../servieces/Loans";
+import { CreateLoan, GetAllLoans, GetLoanById, DeleteLoan, UpdateLoan, GetLoanStatusSummary } from "../servieces/Loans";
 import { GetPersonById, CreatePerson } from "../servieces/People";
 import Table from 'react-bootstrap/Table';
 import DocumentModal from "./DocumentModel";
@@ -14,22 +14,17 @@ export default function Loans() {
         amount: "",
         startDate: "",
         notes: "",
-        repaymentType: "חודשי",
+        repaymentType: "monthly",
         repaymentDay: null,
         singleRepaymentDate: null,
+        amountInMonth: null,
         documentPath: null,
+        numOfLoan: '',
         guarantors: []
     });
     const [render, setrender] = useState(false)
     const [isEdit, setisEdit] = useState(false);
     const [IdUpdate, setidUpdate] = useState('')
-    const [newPerson, setNewPerson] = useState({
-        full_name: '',
-        phone: '',
-        address: '',
-        email: '',
-        notes: ''
-    });
     const [showAddPersonModal, setShowAddPersonModal] = useState(false);
     const [error, setError] = useState("");
     const [showLoanModal, setShowLoanModal] = useState(false); // שליטה על מודל ההלוואה
@@ -37,11 +32,17 @@ export default function Loans() {
     const [showModal, setShowModal] = useState(false);
 
     const handleAddGuarantor = () => {
-        setNewLoan((prev) => ({
-            ...prev,
-            guarantors: [...(prev.guarantors || []), { PeopleId: "" }],
-        }));
+        const lastGuarantor = newLoan.guarantors?.[newLoan.guarantors.length - 1];
+        if (!lastGuarantor || lastGuarantor.PeopleId.trim()) {
+            setNewLoan((prev) => ({
+                ...prev,
+                guarantors: [...(prev.guarantors || []), { PeopleId: "" }],
+            }));
+        } else {
+            alert("יש למלא תעודת זהות לפני שמוסיפים ערב נוסף");
+        }
     };
+
 
     const toggleRow = async (id) => {
         try {
@@ -56,10 +57,6 @@ export default function Loans() {
             }
         }
         setOpenRowId(openRowId === id ? null : id)
-    };
-
-    const handleChange = (e) => {
-        setNewPerson({ ...newPerson, [e.target.name]: e.target.value });
     };
     useEffect(() => {
         async function fetchData() {
@@ -80,6 +77,28 @@ export default function Loans() {
         const { name, value } = e.target;
         setNewLoan({ ...newLoan, [name]: value });
     };
+    const handleIdBlurGuarantor = async (id, index) => {
+        console.log("on")
+        if (id == newLoan.borrowerId) {
+            alert('תעודת זהות של הערב היא תעודת זהות של הלווה')
+            const updated = [...newLoan.guarantors];
+            updated[index] = { ...updated[index], PeopleId: '' };
+            setNewLoan({ ...newLoan, guarantors: updated });
+        }
+        try {
+            const existingPerson = await GetPersonById(id);
+            console.log(existingPerson)
+            if (!existingPerson) {
+                setShowAddPersonModal(true);
+                const updated = [...newLoan.guarantors];
+                updated[index] = { ...updated[index], PeopleId: '' };
+                setNewLoan({ ...newLoan, guarantors: updated });
+            }
+        }
+        catch (e) {
+            console.log(e)
+        }
+    }
     const handleIdBlur = async (id) => {
         console.log("on")
         try {
@@ -87,6 +106,37 @@ export default function Loans() {
             console.log(existingPerson)
             if (!existingPerson) {
                 setShowAddPersonModal(true);
+                setNewLoan({ ...newLoan, ['borrowerId']: '' });
+            }
+            else {
+                const issues = [];
+                const res = await GetLoanStatusSummary(id)
+                console.log(res)
+                if (res.borrower.pendingOrPartial.length != 0) {
+                    alert('למשתמש זה יש כבר הלוואה שעדיין פעילה')
+                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
+                    return
+                }
+
+                if (res.borrower.overdue.length > 0) {
+                    issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה (איחור חריג).');
+                }
+
+                if (res.borrower.late_paid.length > 0) {
+                    issues.push('למשתמש זה יש הלוואה ששולמה באיחור.');
+                }
+
+                if (res.borrower.PaidBy_Gauartantor.length > 0) {
+                    issues.push('למשתמש זה יש הלוואות ששולמו ע"י ערב אחר.');
+                }
+
+                if (res.guarantor.overdue.length > 0) {
+                    issues.push('המשתמש משמש כערב בהלוואה שפג תוקפה ולא שולמה.');
+                }
+
+                if (issues.length > 0) {
+                    alert('אזהרה:\n\n' + issues.join('\n'));
+                }
             }
         }
         catch (e) {
@@ -97,8 +147,8 @@ export default function Loans() {
         e.preventDefault();
         console.log("check", newLoan.guarantors, newLoan.documentPath)
         try {
-            isEdit ? await UpdateLoan(IdUpdate, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.guarantors, newLoan.documentPath) :
-                await CreateLoan(newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.guarantors, newLoan.documentPath)
+            isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.amountInMonth, newLoan.guarantors, newLoan.documentPath) :
+                await CreateLoan(newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.amountInMonth, newLoan.guarantors, newLoan.documentPath)
             setShowLoanModal(false);
             setError('')
         } catch (err) {
@@ -127,7 +177,9 @@ export default function Loans() {
             repaymentType: LoanToUpdate.repaymentType,
             repaymentDay: LoanToUpdate.repaymentDay,
             singleRepaymentDate: LoanToUpdate.singleRepaymentDate,
+            amountInMonth: LoanToUpdate.amountInMonth,
             documentPath: LoanToUpdate.documentPath,
+            numOfLoan: LoanToUpdate.numOfLoan,
             guarantors: res.guarantors
         })
         setisEdit(true)
@@ -151,14 +203,64 @@ export default function Loans() {
             }
         }
     };
+    function formatDateToReadable(dateString) {
+        const date = new Date(dateString);
+
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // חודשים מתחילים מ-0
+        const year = date.getFullYear();
+
+        const hours = date.getHours().toString().padStart(2, '0');
+
+        return `${day}/${month}/${year} בשעה ${hours}:00`;
+    }
+
+
+    function translateLoanStatus(status) {
+        const statusMap = {
+            pending: 'פעילה',
+            partial: 'שולמה חלקית',
+            paid: 'שולמה',
+            overdue: ' פיגור בתשלום',
+            late_paid: 'שולמה באיחור',
+            PaidBy_Gauartantor: 'שולמה על ידי ערב',
+        };
+
+        return statusMap[status] || 'לא ידוע';
+    }
+    function translaterepaymentType(repaymentType) {
+        const statusMap = {
+            monthly: 'חודשי',
+            once: 'חד פעמי',
+        };
+
+        return statusMap[repaymentType] || 'לא ידוע';
+    }
+
     const handleclose = () => {
         setShowLoanModal(false)
         setisEdit(false)
     }
+    const openShowLoanModal = () => {
+        setShowLoanModal(true)
+        setisEdit(false)
+        setNewLoan({
+            borrowerId: "",
+            amount: "",
+            startDate: "",
+            notes: "",
+            repaymentType: "monthly",
+            repaymentDay: null,
+            singleRepaymentDate: null,
+            amountInMonth: null,
+            documentPath: null,
+            guarantors: []
+        })
+    }
     return (
         <div className="container mt-5">
             <div className="d-flex justify-content-start mb-3">
-                <Button variant="primary" onClick={() => setShowLoanModal(true)}>הוסף הלוואה</Button>
+                <Button variant="primary" onClick={() => openShowLoanModal()}>הוסף הלוואה</Button>
             </div>
 
             <Table striped bordered hover size="sm">
@@ -169,8 +271,10 @@ export default function Loans() {
                         <th>סכום</th>
                         <th>סוג החזר</th>
                         <th>יום החזר</th>
+                        <th>סך החזר חודשי </th>
                         <th>סטטוס</th>
                         <th>הערות</th>
+                        <th>תעודת זהות</th>
                         <th>שם הלווה</th>
                         <th>טלפון</th>
                         <th>אימייל</th>
@@ -191,12 +295,14 @@ export default function Loans() {
                                         {openRowId === loanMap.id ? "-" : "+"}
                                     </Button>
                                 </td>
-                                <td>{loanMap.id}</td>
+                                <td>{loanMap.numOfLoan}</td>
                                 <td>{loanMap.amount || "—"}</td>
-                                <td>{loanMap.repaymentType || "—"}</td>
-                                <td>{loanMap.repaymentDay || "—"}</td>
-                                <td>{loanMap.status || "—"}</td>
+                                <td>{translaterepaymentType(loanMap.repaymentType) || "—"}</td>
+                                <td>{loanMap.repaymentDay != "null" ? loanMap.repaymentDay : formatDateToReadable(loanMap.singleRepaymentDate) || "—"}</td>
+                                <td>{loanMap.amountInMonth != "null" ? loanMap.amountInMonth : "—"}</td>
+                                <td>{translateLoanStatus(loanMap.status) || "—"}</td>
                                 <td>{loanMap.notes || "—"}</td>
+                                <td>{loanMap.borrower?.id || "—"}</td>
                                 <td>{loanMap.borrower?.fullName || "—"}</td>
                                 <td>{loanMap.borrower?.phone || "—"}</td>
                                 <td>{loanMap.borrower?.email || "—"}</td>
@@ -248,11 +354,11 @@ export default function Loans() {
                                             )}
 
                                             <strong style={{ display: "block", marginTop: "10px" }}>תשלומים:</strong>
-                                            {loanMap.repayments?.length ? (
+                                            {loan.repayments?.length ? (
                                                 <ul>
-                                                    {loanMap.repayments.map((r, index) => (
+                                                    {loan.repayments.map((r, index) => (
                                                         <li key={index}>
-                                                            {r.date}: ₪{r.amount}
+                                                            {formatDateToReadable(r.paidDate)}: ₪{r.amount}
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -276,6 +382,16 @@ export default function Loans() {
                 </Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handleSubmit}>
+                        <Form.Group className="mb-3">
+                            <Form.Label> מספר הזמנה</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="numOfLoan"
+                                value={newLoan.numOfLoan}
+                                onChange={handleLoanChange}
+                                required
+                            />
+                        </Form.Group>
                         <Form.Group className="mb-3">
                             <Form.Label>תעודת זהות</Form.Label>
                             <Form.Control
@@ -321,12 +437,12 @@ export default function Loans() {
                                 value={newLoan.repaymentType}
                                 onChange={handleLoanChange}
                             >
-                                <option value="חודשי">חודשי</option>
-                                <option value="חד פעמי">חד פעמי</option>
+                                <option value="monthly">חודשי</option>
+                                <option value="once">חד פעמי</option>
                             </Form.Select>
                         </Form.Group>
 
-                        {newLoan.repaymentType === "חודשי" && (
+                        {newLoan.repaymentType === "monthly" && (
                             <Form.Group className="mb-3">
                                 <Form.Label>יום בחודש לתשלום</Form.Label>
                                 <Form.Control
@@ -339,8 +455,19 @@ export default function Loans() {
                                 />
                             </Form.Group>
                         )}
+                        {newLoan.repaymentType === "monthly" && (
+                            <Form.Group className="mb-3">
+                                <Form.Label>  תשלום חודשי בסך:</Form.Label>
+                                <Form.Control
+                                    type="number"
+                                    name="amountInMonth"
+                                    value={newLoan.amountInMonth}
+                                    onChange={handleLoanChange}
+                                />
+                            </Form.Group>
+                        )}
 
-                        {newLoan.repaymentType === "חד פעמי" && (
+                        {newLoan.repaymentType === "once" && (
                             <Form.Group className="mb-3">
                                 <Form.Label>תאריך החזר</Form.Label>
                                 <Form.Control
@@ -422,9 +549,9 @@ export default function Loans() {
                                 הוסף ערב
                             </Button>
                         </div>
-                        {console.log(newLoan.guarantors)}
+
                         {newLoan.guarantors?.map((g, index) => (
-                            <div key={index}>
+                            <div key={index} className="border p-2 mb-2 rounded">
                                 <Form.Group className="mb-2">
                                     <Form.Label>ת.ז ערב {index + 1}</Form.Label>
                                     <Form.Control
@@ -436,55 +563,54 @@ export default function Loans() {
                                             setNewLoan({ ...newLoan, guarantors: updated });
                                         }}
                                         required
-                                        onBlur={() => handleIdBlur(g.PeopleId)}
+                                        onBlur={() => handleIdBlurGuarantor(g.PeopleId, index)}
                                     />
                                 </Form.Group>
 
                                 <Form.Group className="mb-3">
                                     <Form.Label>מסמך ערב</Form.Label>
-
                                     {g.documentPath ? (
-                                        <div className="mb-2">
-                                            <div>
-                                                <span>קובץ קיים: </span>
+                                        <>
+                                            <div className="mb-2">
                                                 <div>
-                                                    <button onClick={() => setShowModal(true)}>הצג קובץ</button>
-                                                    <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}`} />
+                                                    <span>קובץ קיים: </span>
+                                                    <div>
+                                                        <button onClick={() => setShowModal(true)}>הצג קובץ</button>
+                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}`} />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-danger btn-sm ms-2"
+                                                        onClick={() => {
+                                                            const updated = [...newLoan.guarantors];
+                                                            updated[index] = {
+                                                                ...updated[index],
+                                                                document: null,
+                                                                documentPath: null
+                                                            };
+                                                            setNewLoan({ ...newLoan, guarantors: updated });
+                                                        }}
+                                                    >
+                                                        <i className="bi bi-trash"></i>
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-danger btn-sm ms-2"
-                                                    onClick={() => {
+                                                <Form.Label className="mt-2">החלף קובץ:</Form.Label>
+                                                <Form.Control
+                                                    type="file"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files[0];
+                                                        if (!file) return;
+
                                                         const updated = [...newLoan.guarantors];
                                                         updated[index] = {
                                                             ...updated[index],
-                                                            document: null,
-                                                            documentPath: null
+                                                            document: file
                                                         };
                                                         setNewLoan({ ...newLoan, guarantors: updated });
-                                                    }
-                                                    }
-                                                >
-                                                    <i className="bi bi-trash"></i> {/* Bootstrap icon */}
-                                                </button>
+                                                    }}
+                                                />
                                             </div>
-                                            <Form.Label className="mt-2">החלף קובץ:</Form.Label>
-                                            <Form.Control
-                                                type="file"
-                                                onChange={(e) => {
-                                                    const file = e.target.files[0];
-                                                    if (!file) return;
-
-                                                    const updated = [...newLoan.guarantors];
-                                                    updated[index] = {
-                                                        ...updated[index],
-                                                        document: file
-                                                    };
-                                                    setNewLoan({ ...newLoan, guarantors: updated });
-                                                }}
-                                            />
-
-                                        </div>
+                                        </>
                                     ) : (
                                         <Form.Control
                                             type="file"
@@ -500,8 +626,20 @@ export default function Loans() {
                                     )}
                                 </Form.Group>
 
+                                <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    onClick={() => {
+                                        const updated = [...newLoan.guarantors];
+                                        updated.splice(index, 1);
+                                        setNewLoan({ ...newLoan, guarantors: updated });
+                                    }}
+                                >
+                                    הסר ערב
+                                </Button>
                             </div>
                         ))}
+
 
                         <Button variant="primary" type="submit">
                             שמור

@@ -1,8 +1,9 @@
+const path = require('path');
 const { Sequelize } = require('sequelize');
 
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: './gmach.sqlite', // שמור בקובץ מקומי
+  storage: path.join(__dirname, 'data', 'gmach.sqlite'), // קובץ בתוך server/data
 });
 
 module.exports = sequelize;

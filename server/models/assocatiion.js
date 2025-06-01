@@ -3,7 +3,7 @@ const People = require('./People');
 const Guarantor = require('./Guarantor');
 const Repayment = require('./Repayment');
 const FundMovement = require('./FundMovement');
-
+const Deposit =require('./Deposit')
 // הלוואה שייכת ללווה
 Loan.belongsTo(People, { foreignKey: 'borrowerId', as: 'borrower' });
 
@@ -15,7 +15,8 @@ Guarantor.belongsTo(People, { foreignKey: 'PeopleId', as: 'guarantor' });
 Loan.hasMany(Guarantor, { foreignKey: 'loanId', as: 'guarantors' });
 
 // החזר שייך להלוואה
-Repayment.belongsTo(Loan, { foreignKey: 'loanId' });
+Repayment.belongsTo(Loan, { foreignKey: 'loanId', as: 'loan' });
+
 
 // הלוואה מכילה החזרים
 Loan.hasMany(Repayment, { foreignKey: 'loanId', as: 'repayments' });
@@ -25,3 +26,10 @@ FundMovement.belongsTo(People, { foreignKey: 'personId', as: 'person' });
 
 // אדם יכול להיות לו מספר תנועות
 People.hasMany(FundMovement, { foreignKey: 'personId', as: 'fundMovements' });
+
+Deposit.belongsTo(People, { foreignKey: 'PeopleId', as: 'person' });
+
+
+People.hasMany(Deposit, { foreignKey: 'PeopleId', as: 'Deposit' });
+
+  

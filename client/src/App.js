@@ -8,9 +8,10 @@ import FundMovments from './components/FundMovments';
 import Header from './components/Header';
 import Sidebar from './components/Siderbar';
 import { Explaination } from './components/Explaination';
+import  Deposit  from './components/Deposit';
 import './App.css'; // אם שמת את הסגנון כאן
 import './styles/colors.css';
-
+import { Notification } from './components/Notification';
 function App() {
   return (
     <Router>
@@ -26,6 +27,8 @@ function App() {
               <Route path="/loans" element={<Loans />} />
               <Route path="/repayments" element={<Repayments />} />
               <Route path="/Explaination" element={<Explaination />} />
+              <Route path="/Deposit" element={<Deposit />} />
+              <Route path="/Notification" element={<Notification />} />
             </Routes>
           </main>
         </div>

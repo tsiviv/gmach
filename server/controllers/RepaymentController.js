@@ -1,12 +1,16 @@
 const Repayment = require('../models/Repayment');
 const Loan = require('../models/Loan');
 const { createFundMovement } = require('./fundMovementController')
+const FundMovement = require('../models/FundMovement');
+const People = require('../models/People');
+
 module.exports = {
     GetAllRepayments: async (req, res) => {
         try {
             const repayments = await Repayment.findAll({
-                include: [{ model: Loan }],
-              });
+                model: Loan, as: 'loan'
+            }
+            );
             res.json(repayments);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -18,7 +22,7 @@ module.exports = {
             const { loanId } = req.params;
             const repayments = await Repayment.findAll({
                 where: { loanId },
-                include: [{ model: Loan }],
+                include: [{ model: Loan, as: 'loan' }],
             });
             res.json(repayments);
         } catch (err) {
@@ -28,20 +32,20 @@ module.exports = {
 
     CreateRepayment: async (req, res) => {
         try {
-            const { loanId, amount, paidDate, notes } = req.body;
-            const repayment = await Repayment.create({ loanId, amount, paidDate, notes });
-            await updateLoanStatus(loanId);
+            const { loanId, Guarantor, amount, paidDate, notes } = req.body;
+            const repayment = await Repayment.create({ loanId, Guarantor, amount, paidDate, notes });
+            await updateLoanStatus(loanId, Guarantor);
             const loan = await Loan.findByPk(loanId);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
             }
-            await createFundMovement({
-                personId: loan.personId,
-                amount: amount,
-                type: 'repayment',
-                description: `Repayment for loan #${loanId}`,
-                date: paidDate,
-            });
+            await createFundMovement(
+                loan.borrowerId,
+                amount,
+                'repayment_received',
+                `Repayment for loan #${loanId}`,
+                paidDate,
+            );
             res.status(201).json(repayment);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -51,24 +55,31 @@ module.exports = {
     UpdateRepayment: async (req, res) => {
         try {
             const { id } = req.params;
-            const { loanId, amount, paidDate, notes } = req.body;
+            const { loanId, Guarantor, amount, paidDate, notes } = req.body;
             const repayment = await Repayment.findByPk(id);
             if (!repayment) return res.status(404).json({ error: 'Repayment not found' });
-
-            await repayment.update({ loanId, amount, paidDate, notes });
-            await updateLoanStatus(loanId);
             const loan = await Loan.findByPk(loanId);
+            const existingMovement = await FundMovement.findOne({
+                where: {
+                    personId: loan.borrowerId,
+                    type: 'repayment_received',
+                    date: repayment.paidDate, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
+                },
+            });
+
+            if (existingMovement) {
+                await existingMovement.update({ amount });
+                console.log('עודכנה תנועת קרן קיימת');
+            } else {
+                console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
+            }
+            await repayment.update({ loanId, Guarantor, amount, paidDate, notes });
+            await updateLoanStatus(loanId, Guarantor);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
             }
             // צור תנועה כספית (חיוב החזר)
-            await createFundMovement({
-                personId: loan.personId,
-                amount: amount,
-                type: 'repayment',
-                description: `Repayment for loan #${loanId}`,
-                date: paidDate,
-            });
+
             res.json(repayment);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -89,40 +100,49 @@ module.exports = {
     }
 
 };
-const updateLoanStatus = async (loanId) => {
+const updateLoanStatus = async (loanId, Guarantor) => {
     const loan = await Loan.findByPk(loanId, {
-      include: [Repayment],
+        include: [{ model: Repayment, as: 'repayments' }]
     });
-  
-    const totalRepaid = loan.Repayments.reduce((sum, r) => sum + r.amount, 0);
+
+    if (!loan) throw new Error('Loan not found');
+    const totalRepaid = loan.repayments.reduce((sum, r) => sum + r.amount, 0);
     const dueAmount = loan.amount;
     const now = new Date();
-  
+    console.log("totalRepaid", totalRepaid)
     let newStatus = 'pending';
-  
-    if (loan.repaymentType === 'single') {
-      const isLate = loan.singleRepaymentDate && totalRepaid < dueAmount && now > new Date(loan.singleRepaymentDate);
-      if (totalRepaid >= dueAmount) {
-        newStatus = isLate ? 'late_paid' : 'paid';
-      } else if (totalRepaid > 0) {
-        newStatus = 'partial';
-      } else {
-        newStatus = 'pending';
-      }
-    } else if (loan.repaymentType === 'monthly') {
-      const monthsSinceStart = (now.getFullYear() - loan.startDate.getFullYear()) * 12 + (now.getMonth() - loan.startDate.getMonth()) + 1;
-      const expectedRepayments = monthsSinceStart;
-      const actualRepayments = loan.Repayments.length;
-  
-      if (totalRepaid >= dueAmount) {
-        newStatus = 'paid';
-      } else if (actualRepayments < expectedRepayments) {
-        newStatus = 'overdue'; 
-      } else {
-        newStatus = 'partial';
-      }
+    console.log(loan.repaymentType)
+    if (Guarantor) {
+        newStatus = 'PaidBy_Gauartantor';
+    } else {
+        if (loan.repaymentType === 'once') {
+            console.log(loan.repaymentType)
+            const isLate = loan.singleRepaymentDate && totalRepaid < dueAmount && now > new Date(loan.singleRepaymentDate);
+            if (totalRepaid >= dueAmount) {
+                newStatus = isLate ? 'late_paid' : 'paid';
+            } else if (totalRepaid > 0) {
+                console.log("partial")
+                newStatus = 'partial';
+            } else {
+                newStatus = 'pending';
+            }
+        } else if (loan.repaymentType === 'monthly') {
+            console.log("monthly")
+            const monthsSinceStart = (now.getFullYear() - loan.startDate.getFullYear()) * 12 + (now.getMonth() - loan.startDate.getMonth()) + 1;
+            const expectedRepayments = monthsSinceStart;
+            const actualRepayments = loan.repayments.length;
+
+            if (totalRepaid >= dueAmount) {
+                newStatus = 'paid';
+            } else if (actualRepayments < expectedRepayments) {
+                newStatus = 'overdue';
+            } else {
+                console.log("partial")
+                newStatus = 'partial';
+            }
+        }
     }
-  
+
     await loan.update({ status: newStatus });
-  };
-  
+
+};

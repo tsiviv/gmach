@@ -15,6 +15,7 @@ export const GetAllLoans = async () => {
     }
 }
 export const CreateLoan = async (
+    numOfLoan,
     borrowerId,
     amount,
     startDate,
@@ -22,6 +23,7 @@ export const CreateLoan = async (
     repaymentType,
     repaymentDay,
     singleRepaymentDate,
+    amountInMonth,
     guarantorsWithFiles = [],
     loanDocument = null
 ) => {
@@ -35,6 +37,8 @@ export const CreateLoan = async (
         formData.append('repaymentType', repaymentType);
         formData.append('repaymentDay', repaymentDay);
         formData.append('singleRepaymentDate', singleRepaymentDate);
+        formData.append('amountInMonth', amountInMonth);
+        formData.append('numOfLoan', numOfLoan);
 
         // ערבֵים - שומר רק את המידע בלי הקובץ
         const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
@@ -78,9 +82,20 @@ export const GetLoanById = async (id) => {
         throw error
     }
 }
+export const GetLoanStatusSummary = async (personId) => {
+    try {
+        const res = await axios.get(`${url}/Loan/GetLoanStatusSummary/${personId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+        return res.data
+    } catch (error) {
+        console.error(`Error fetching loan ${personId}:`, error)
+        throw error
+    }
+}
 
 export const UpdateLoan = async (
-    id,
+    id,numOfLoan,
     borrowerId,
     amount,
     startDate,
@@ -88,6 +103,7 @@ export const UpdateLoan = async (
     repaymentType,
     repaymentDay,
     singleRepaymentDate,
+    amountInMonth,
     guarantorsWithFiles = [],
     loanDocument = null
 ) => {
@@ -101,6 +117,8 @@ export const UpdateLoan = async (
         formData.append('repaymentType', repaymentType);
         formData.append('repaymentDay', repaymentDay);
         formData.append('singleRepaymentDate', singleRepaymentDate);
+        formData.append('amountInMonth', amountInMonth);
+        formData.append('numOfLoan', numOfLoan);
 
         const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
         formData.append('guarantors', JSON.stringify(guarantorsOnly));
@@ -157,6 +175,7 @@ export const GetUnpaidLoans = async () => {
 }
 
 export const GetOverdueLoans = async () => {
+    console.log('GetOverdueLoans')
     try {
         const res = await axios.get(`${url}/Loan/GetOverdueLoans`, {
             headers: { Authorization: `Bearer ${token}` },

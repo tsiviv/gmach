@@ -8,6 +8,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const FundMovement = require('../models/FundMovement');
+const moment = require('moment');
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -43,6 +44,7 @@ module.exports = {
 
     // שליפת הלוואה לפי מזהה
     GetLoanById: async (req, res) => {
+        console.log('GetLoanById')
         try {
             const { id } = req.params;
             const loan = await Loan.findByPk(id, {
@@ -82,7 +84,7 @@ module.exports = {
             }
 
             try {
-                const { borrowerId, amount, startDate, notes, repaymentType, repaymentDay, singleRepaymentDate } = req.body;
+                const { borrowerId, amount, startDate, notes, repaymentType, repaymentDay, singleRepaymentDate, amountInMonth, numOfLoan } = req.body;
                 const guarantors = JSON.parse(req.body.guarantors || '[]');
 
                 const newLoan = await Loan.create({
@@ -93,7 +95,7 @@ module.exports = {
                     startDate,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate
+                    singleRepaymentDate, amountInMonth, numOfLoan
                 });
 
                 const loanFile = req.files.find(f => f.fieldname === 'loanDocument');
@@ -139,6 +141,7 @@ module.exports = {
     },
 
     UpdateLoan: async (req, res) => {
+        console.log('')
         upload.any()(req, res, async (err) => {
             if (err) {
                 return res.status(400).json({ error: 'File upload error', details: err.message });
@@ -155,7 +158,7 @@ module.exports = {
                     notes,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate
+                    singleRepaymentDate, amountInMonth, numOfLoan
                 } = req.body;
 
                 const guarantors = JSON.parse(req.body.guarantors || '[]');
@@ -163,7 +166,7 @@ module.exports = {
                 const loan = await Loan.findByPk(id);
                 if (!loan) return res.status(404).json({ error: 'Loan not found' });
 
-                if(loan.amount!=amount){
+                if (loan.amount != amount) {
                     const existingMovement = await FundMovement.findOne({
                         where: {
                             personId: loan.borrowerId,
@@ -171,13 +174,14 @@ module.exports = {
                             date: loan.startDate, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
                         },
                     });
-                
+
                     if (existingMovement) {
                         await existingMovement.update({ amount });
                         console.log('עודכנה תנועת קרן קיימת');
                     } else {
                         console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
-                    }}
+                    }
+                }
                 if (loan.documentPath && fs.existsSync(loan.documentPath)) {
                     oldPathsToDelete.push(loan.documentPath);
                 }
@@ -190,7 +194,7 @@ module.exports = {
                     notes,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate,
+                    singleRepaymentDate, amountInMonth, numOfLoan
                 });
 
                 // מסמך הלוואה חדש
@@ -212,7 +216,7 @@ module.exports = {
                     console.log("SDfg");
                     await loan.update({ documentPath: null });
                 }
-                
+
 
                 const oldGuarantors = await Guarantor.findAll({ where: { loanId: loan.id } });
                 for (const g of oldGuarantors) {
@@ -270,12 +274,12 @@ module.exports = {
             const loan = await Loan.findByPk(id);
             const existingMovement = await FundMovement.findOne({
                 where: {
-                    personId: loan.personId,
+                    personId: loan.borrowerId,
                     type: 'loan_given',
-                    date: loan.date, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
+                    date: loan.startDate, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
                 },
             });
-        
+
             if (existingMovement) {
                 await FundMovement.destroy({ where: { id: existingMovement.id } });
                 console.log('עודכנה תנועת קרן קיימת');
@@ -340,10 +344,6 @@ module.exports = {
                 ]
             });
 
-            const unpaidLoans = loans.filter(loan => {
-                const totalPaid = loan.Repayments.reduce((sum, r) => sum + r.amount, 0);
-                return totalPaid < loan.amount;
-            });
 
             res.json(unpaidLoans);
         } catch (err) {
@@ -354,13 +354,10 @@ module.exports = {
     // הלוואות שפג תוקפן
     GetOverdueLoans: async (req, res) => {
         try {
-            const today = new Date();
-
+console.log("overdueLoans")
             const overdueLoans = await Loan.findAll({
                 where: {
-                    dueDate: {
-                        [Op.lt]: today
-                    }
+                    status: 'overdue'
                 },
                 include: [
                     {
@@ -389,45 +386,111 @@ module.exports = {
             res.status(500).json({ error: 'שגיאה בשליפת הלוואות שפג תוקפן' });
         }
     },
-    // בדיקת תשלומים חסרים חודשיים
-    GetLoansWithMissingMonthlyRepayments: async (req, res) => {
+
+    GetLoanStatusSummary: async (req, res) => {
         try {
-            const today = new Date();
-            const loans = await Loan.findAll({
-                where: { repaymentType: 'monthly' },
-                include: [
-                    {
-                        model: Repayment,
-                        as: 'repayments',
-                    },
-                    {
-                        model: People,
-                        as: 'borrower'
-                    }
-                ]
+            const { personId } = req.params;
+
+            // כל ההלוואות של האדם כלווה
+            const borrowerLoans = await Loan.findAll({
+                where: { borrowerId: personId }
             });
 
-            const loansWithMissing = loans.filter(loan => {
-                const startDate = new Date(loan.startDate);
-                const repaymentDay = loan.repaymentDay || 1;
-                let expectedMonths = (today.getFullYear() - startDate.getFullYear()) * 12 + (today.getMonth() - startDate.getMonth()) + 1;
+            // מחלקים לפי סטטוס, עם איחוד של 'pending' ו-'partial'
+            const borrowerLoansByStatus = {
+                pendingOrPartial: [],
+                paid: [],
+                overdue: [],
+                late_paid: [],
+                PaidBy_Gauartantor: [],
+            };
 
-                const expectedDates = [];
-                for (let i = 0; i < expectedMonths; i++) {
-                    const due = new Date(startDate.getFullYear(), startDate.getMonth() + i, repaymentDay);
-                    if (due <= today) expectedDates.push(due.toISOString().split('T')[0]); // פורמט yyyy-mm-dd
+            borrowerLoans.forEach(loan => {
+                const status = loan.status;
+                if (status === 'pending' || status === 'partial') {
+                    borrowerLoansByStatus.pendingOrPartial.push(loan);
+                } else if (borrowerLoansByStatus[status]) {
+                    borrowerLoansByStatus[status].push(loan);
+                }
+            });
+
+            // כל ההלוואות שהאדם ערב להן
+            const guarantorLinks = await Guarantor.findAll({
+                where: { PeopleId: personId },
+                include: [{
+                    model: Loan,
+                    required: true
+                }]
+            });
+
+            const guarantorLoansByStatus = {
+                overdue: [],
+                late_paid: [],
+            };
+
+            guarantorLinks.forEach(link => {
+                const loan = link.Loan;
+                if (!loan) return;
+
+                if (loan.status === 'overdue') {
+                    guarantorLoansByStatus.overdue.push(loan);
+                } else if (loan.status === 'late_paid') {
+                    guarantorLoansByStatus.late_paid.push(loan);
+                }
+            });
+
+            res.json({
+                borrower: borrowerLoansByStatus,
+                guarantor: guarantorLoansByStatus
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+        }
+    },
+      updateLoanStatuses: async () => {
+        const loans = await Loan.findAll({
+            where: {
+                status: { [Op.notIn]: ['paid'] },
+            }
+        });
+
+        for (const loan of loans) {
+            const repayments = await Repayment.findAll({
+                where: { loanId: loan.id }
+            });
+
+            if (loan.repaymentType === 'monthly') {
+                const monthsPassed = moment().diff(moment(loan.startDate), 'months');
+                let lateMonths = 0;
+
+                for (let i = 0; i <= monthsPassed; i++) {
+                    const monthStart = moment(loan.startDate).add(i, 'months').startOf('month');
+                    const monthEnd = moment(loan.startDate).add(i, 'months').endOf('month');
+
+                    const paidInThisMonth = repayments.some(repayment =>
+                        moment(repayment.paidDate).isBetween(monthStart, monthEnd, null, '[]')
+                    );
+
+                    if (!paidInThisMonth) {
+                        lateMonths++;
+                    }
                 }
 
-                const actualPaidDates = loan.Repayments.map(r => new Date(r.paidDate).toISOString().split('T')[0]);
+                // Update lateCount only if changed
+                if (loan.lateCount !== lateMonths) {
+                    loan.lateCount = lateMonths;
+                    loan.status = lateMonths > 0 ? 'overdue' : 'partial';
+                    await loan.save();
+                }
 
-                const missingDates = expectedDates.filter(date => !actualPaidDates.includes(date));
-
-                return missingDates.length > 0;
-            });
-
-            res.json(loansWithMissing);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
+            } else if (loan.repaymentType === 'once') {
+                const paid = repayments.length > 0;
+                if (!paid && moment().isAfter(loan.singleRepaymentDate)) {
+                    loan.status = 'overdue';
+                    await loan.save();
+                }
+            }
         }
     }
 

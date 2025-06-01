@@ -13,8 +13,8 @@ export const GetAllRepayments=async()=>{
     return res.data;
 }
 
-export const CreateRepayment=async( loanId, amount, paidDate, notes )=>{
-    const res=await axios.post(`${url}/Repayment`,{ loanId, amount, paidDate, notes }, {
+export const CreateRepayment=async( loanId,Guarantor, amount, paidDate, notes )=>{
+    const res=await axios.post(`${url}/Repayment`,{Guarantor, loanId, amount, paidDate, notes }, {
         headers: {
             Authorization: `Bearer ${token}`,
         },
@@ -31,8 +31,8 @@ export const GetRepaymentsByLoanId=async(loanId)=>{
     return res.data;
 }
 
-export const UpdateRepayment=async(id, loanId, amount, paidDate, notes )=>{
-    const res=await axios.put(`${url}/Repayment/${id}`,{ loanId, amount, paidDate, notes} , {
+export const UpdateRepayment=async(id, loanId,Guarantor, amount, paidDate, notes )=>{
+    const res=await axios.put(`${url}/Repayment/${id}`,{ Guarantor,loanId, amount, paidDate, notes} , {
         headers: {
             Authorization: `Bearer ${token}`,
         },

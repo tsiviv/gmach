@@ -30,6 +30,11 @@ export default function Sidebar() {
             <p className='p-icon'>ניהול תנועות</p> <FaExchangeAlt /> 
           </NavLink>
         </div>
+        <div className="nav-item">
+          <NavLink to="/Deposit" className={linkClass}>
+            <p className='p-icon'>ניהול פקדונות</p> <FaExchangeAlt /> 
+          </NavLink>
+        </div>
       </div>
     </div>
   );

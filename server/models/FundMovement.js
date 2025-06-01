@@ -22,7 +22,7 @@ const FundMovement = sequelize.define('FundMovement', {
     allowNull: false,
   },
   type: {
-    type: DataTypes.ENUM('loan_given', 'repayment_received', 'donation', 'manual_adjustment'),
+    type: DataTypes.ENUM('loan_given', 'repayment_received', 'donation', 'manual_adjustment','deposit','pull_deposit'),
     allowNull: false,
   },
   description: {

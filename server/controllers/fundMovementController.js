@@ -2,10 +2,10 @@ const FundMovement = require('../models/FundMovement');
 const People = require('../models/People');
 
 module.exports = {
-  // יצירת תנועה חדשה
   createMovement: async (req, res) => {
     try {
       const { personId, amount, type, description, date } = req.body;
+      console.log( personId, amount, type, description, date)
       const movement = await FundMovement.create({ personId, amount, type, description, date });
       res.status(201).json(movement);
     } catch (err) {
@@ -18,7 +18,7 @@ module.exports = {
       const { id } = req.params;
       const movement = await FundMovement.findByPk(id);
       const { personId, amount, type, description, date } = req.body;
-      movement.update(personId, amount, type, description, date )
+      await movement.update({personId, amount, type, description, date })
       res.status(201).json(movement);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -56,6 +56,7 @@ module.exports = {
     }
   },
   createFundMovement:async function ( personId, amount, type, description = '', date = new Date() ) {
+    console.log("create",personId,amount,type)
     if (!personId || !amount || !type) {
       console.log(personId, amount, type, description)
       throw new Error('Missing required fields');

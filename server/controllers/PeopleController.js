@@ -73,13 +73,11 @@ module.exports = {
   GetLoansByGuarantor: async (req, res) => {
     try {
       const { id } = req.params;
-
-      // תחילה מוצאים את כל הערבויות שבהן הוא ערב
       const guarantorLoans = await Guarantor.findAll({
         where: { PeopleId: id },
         include: [
           {
-            model: Loan, // שם המודל
+            model: Loan, 
             include: [
               {
                 model: People,
@@ -98,6 +96,7 @@ module.exports = {
       res.status(500).json({ error: err.message });
     }
   },
+  
   // עדכון פרטי אדם
   UpdatePerson: async (req, res) => {
     try {

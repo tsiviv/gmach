@@ -8,6 +8,10 @@ const Loan = sequelize.define('Loan', {
     primaryKey: true,
     autoIncrement: true,
   },
+  numOfLoan:{
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   borrowerId: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -29,7 +33,7 @@ const Loan = sequelize.define('Loan', {
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('pending', 'partial', 'paid', 'overdue', 'late_paid'),
+    type: DataTypes.ENUM('pending', 'partial', 'paid', 'overdue', 'late_paid','PaidBy_Gauartantor'),
     allowNull: false,
     defaultValue: 'pending'
   },
@@ -38,7 +42,16 @@ const Loan = sequelize.define('Loan', {
     allowNull: false,
     defaultValue: 'once'
   },
+  lateCount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  },  
   repaymentDay: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  amountInMonth: {
     type: DataTypes.INTEGER,
     allowNull: true,
   },

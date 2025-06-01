@@ -9,12 +9,14 @@ import {
     CreatePerson,
     GetPersonById
 } from '../servieces/People';
+import '../styles/fund.css'
 import ModelNewPerson from './ModelNewPerson';
 export default function FundMovementsPage({ isAdmin }) {
     const [movements, setMovements] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [id, setid] = useState('')
+    const [MoneyInGmach, setMoneyInGmach] = useState(0)
     const [currentMovement, setCurrentMovement] = useState({
         amount: '',
         type: 'manual_adjustment',
@@ -28,21 +30,60 @@ export default function FundMovementsPage({ isAdmin }) {
     useEffect(() => {
         loadMovements();
     }, []);
+    const countMoneyInKopa = (data) => {
+        let sum = 0;
 
+        data.forEach(element => {
+            const type = (element.type || '').toLowerCase().trim();
+            const amount = Number(element.amount) || 0;
+
+            if (type === 'manual_adjustment' || type === 'donation' || type === 'deposit' || type == 'repayment_received') {
+                sum += amount;
+            } else {
+                sum -= amount;
+            }
+        });
+
+        setMoneyInGmach(sum);
+    }
+    function translateLoanStatus(status) {
+        const statusMap = {
+            pending: 'ממתינה',
+            partial: 'שולמה חלקית',
+            paid: 'שולמה',
+            overdue: 'פיגור',
+            late_paid: 'שולמה באיחור',
+            PaidBy_Gauartantor: 'שולמה על ידי ערב',
+        };
+
+        return statusMap[status] || 'לא ידוע';
+    }
+    function translateMovmemntType(MovmemntType) {
+        const statusMap = {
+            repayment_received: 'תשלום על הלוואה',
+            loan_given: 'הלוואה',
+            deposit: 'הפקדה',
+            pull_deposit: 'משיכה',
+            donation: 'תרומה',
+            manual_adjustment: 'הפקדת מנהל',
+        };
+
+        return statusMap[MovmemntType] || 'לא ידוע';
+    }
     const loadMovements = async () => {
-        const data = await getAllMovements();
-        setMovements(data);
+        try {
+            const data = await getAllMovements();
+            setMovements(data);
+            countMoneyInKopa(data)
+            console.log(data)
+        }
+        catch (e) {
+            console.log(e)
+        }
     };
 
     const handleAddClick = () => {
         setIsEdit(false);
-        setCurrentMovement({
-            amount: '',
-            type: '',
-            description: '',
-            date: '',
-            personId: ''
-        });
         setShowModal(true);
     };
 
@@ -66,7 +107,9 @@ export default function FundMovementsPage({ isAdmin }) {
         }));
     };
 
-    const submitMovement = async () => {
+    const submitMovement = async (e) => {
+        console.log(currentMovement.type)
+        e.preventDefault();
         try {
             if (isEdit) {
                 await updateFundMovement(id, currentMovement.personId, currentMovement.amount, currentMovement.type, currentMovement.description, currentMovement.date);
@@ -94,10 +137,13 @@ export default function FundMovementsPage({ isAdmin }) {
 
     return (
         <>
-            <Button className="mb-3" onClick={handleAddClick}>
-                הוסף תנועה
-            </Button>
-
+            <div className='header-fund'>
+                <Button className="mb-3" onClick={handleAddClick}>
+                    הוסף תנועה
+                </Button>
+                <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
+                    יש {MoneyInGmach.toLocaleString()} ₪ בגמח
+                </div>            </div>
             <Table striped bordered hover>
                 <thead>
                     <tr>
@@ -113,14 +159,14 @@ export default function FundMovementsPage({ isAdmin }) {
                     {movements.map((mov) => (
                         <tr key={mov.id}>
                             <td>{mov.amount}</td>
-                            <td>{mov.type}</td>
+                            <td>{translateMovmemntType(mov.type)}</td>
                             <td>{mov.description}</td>
                             <td>{mov.date}</td>
                             <td>{mov.personId}</td>
                             <td>
-                                <Button size="sm" onClick={() => handleEditClick(mov)}>
+                                {!(mov.type == 'loan_given' || mov.type == 'repayment_received' || mov.type == 'deposit' || mov.type == 'pull_deposit' || mov.type == 'repayment') && <Button size="sm" onClick={() => handleEditClick(mov)}>
                                     ערוך
-                                </Button>
+                                </Button>}
                             </td>
                         </tr>
                     ))}
@@ -153,8 +199,8 @@ export default function FundMovementsPage({ isAdmin }) {
                                 onChange={handleChange}
                                 required
                             >
-                                <option value="donation">תרומה</option>
                                 <option value="manual_adjustment">התאמה ידנית</option>
+                                <option value="donation">תרומה</option>
                             </Form.Control>
                         </Form.Group>
 
@@ -187,7 +233,6 @@ export default function FundMovementsPage({ isAdmin }) {
                                     name="personId"
                                     value={currentMovement.personId}
                                     onChange={handleChange}
-                                    required
                                     onBlur={() => handleIdBlur(currentMovement.personId)}
                                 />
                             </Form.Group>

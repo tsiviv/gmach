@@ -22,7 +22,7 @@ export const createFundMovement = async (personId, amount, type, description, da
   try {
     const res = await axios.post(
       `${url}/FundMovement`,
-      { personId, amount, type, description, date },
+      { personId: personId ? personId : null, amount, type, description, date },
       getAuthHeaders()
     );
     return res.data;
@@ -31,11 +31,11 @@ export const createFundMovement = async (personId, amount, type, description, da
     throw error;
   }
 };
-export const updateFundMovement = async (id,personId, amount, type, description, date) => {
+export const updateFundMovement = async (id, personId, amount, type, description, date) => {
   try {
     const res = await axios.put(
       `${url}/FundMovement/${id}`,
-      { personId, amount, type, description, date },
+      { personId: personId ? personId : null, amount, type, description, date },
       getAuthHeaders()
     );
     return res.data;

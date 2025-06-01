@@ -6,6 +6,7 @@ import Form from 'react-bootstrap/Form';
 import { GetLoansByGuarantor, CreatePerson, DeletePerson, GetLoansByPerson, GetAllPeople, UpdatePerson } from '../servieces/People';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from './ModelNewPerson';
+import { getDepositByPersonId } from '../servieces/Deposit';
 function People() {
     const [error, setError] = useState("");
     const [people, setPeople] = useState([]);
@@ -14,7 +15,8 @@ function People() {
     const [openLoanId, setOpenLoanId] = useState(null);
     const [render, setrender] = useState(false)
     const [loans, setloans] = useState([])
-    const [isEdit,setisEdit]=useState(false)
+    const [isEdit, setisEdit] = useState(false)
+    const [deposit, setdeposit] = useState('')
     const [newPerson, setNewPerson] = useState({
         full_name: '',
         phone: '',
@@ -39,10 +41,25 @@ function People() {
         };
         fetch();
     }, [showModal, render]);
+    function translateLoanStatus(status) {
+        const statusMap = {
+            pending: 'פעילה',
+            partial: 'שולמה חלקית',
+            paid: 'שולמה',
+            overdue: ' פיגור בתשלום',
+            late_paid: 'שולמה באיחור',
+            PaidBy_Gauartantor: 'שולמה על ידי ערב',
+        };
+    
+        return statusMap[status] || 'לא ידוע';
+    }
+    
     const showLoans = async (id) => {
         try {
             const res = await GetLoansByPerson(id);
-            console.log(res)
+            const res2 = await getDepositByPersonId(id);
+            setdeposit(res2)
+            console.log(res2)
             setloans(res);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
@@ -191,13 +208,21 @@ function People() {
                                                 <ul>
                                                     {loans.map((loan) => (
                                                         <li key={loan.id} style={{ marginBottom: "1em" }}>
-                                                            סכום: {loan.amount} ש"ח, תשלום חודשי ב-{loan.repaymentDay} לחודש, סטטוס: {loan.status}{" "} <td><a
+                                                            סכום: {loan.amount} ש"ח, תשלום חודשי ב-{loan.repaymentDay} לחודש, סטטוס: {translateLoanStatus(loan.status)}{" "}
+                                                            <br />
+                                                            {loan.lateCount === 0 ? (
+                                                                <span>אין איחור בתשלום</span>
+                                                            ) : (
+                                                                <span>{loan.lateCount} איחורים בתשלום</span>
+                                                            )}
+                                                            <br />
+                                                            <a
                                                                 href={`http://localhost:4000/${loan.documentPath}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                             >
                                                                 מסמך הלוואה
-                                                            </a></td>
+                                                            </a>
                                                             <button onClick={() => toggleGuarantors(loan.id)}>
                                                                 {openLoanId === loan.id ? "הסתר ערבים" : "הצג ערבים"}
                                                             </button>
@@ -221,6 +246,13 @@ function People() {
                                                         </li>
                                                     ))}
                                                 </ul>
+                                                {deposit && (
+                                                    <p>
+                                                        {deposit.deposit_amount > 0 && `המשתמש הפקיד ${deposit.deposit_amount} ש"ח`}
+                                                        {deposit.deposit_amount > 0 && deposit.pull_amount > 0 && ' ו־'}
+                                                        {deposit.pull_amount > 0 && `משך ${deposit.pull_amount} ש"ח`}
+                                                    </p>
+                                                )}
                                             </>
                                         )}
                                     </td>
@@ -230,8 +262,8 @@ function People() {
                         </>
                     ))}
                 </tbody>
-            </Table>    
-            <ModelNewPerson showModal={showModal} updatePerson={newPerson} setShowModal={setShowModal} isEdit={isEdit} setisEdit={setisEdit}/>     
+            </Table>
+            <ModelNewPerson showModal={showModal} updatePerson={newPerson} setShowModal={setShowModal} isEdit={isEdit} setisEdit={setisEdit} />
         </div>
     );
 }

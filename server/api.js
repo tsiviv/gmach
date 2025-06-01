@@ -9,9 +9,9 @@ const RepaymentRoute = require('./routes/RepaymentRoute')
 const fundMovementRoute = require('./routes/fundMovementRoute')
 const LoginRoute = require('./routes/LoginRoute')
 const cron = require('node-cron');
-const axios = require('axios');
-
-
+const { updateLoanStatuses } = require('./controllers/LoanController')
+const DepositRoute = require('./routes/DepositRoute')
+const notificationsRouter = require('./routes/notifications');
 
 require('./models/assocatiion')
 const cors = require('cors')
@@ -27,15 +27,18 @@ app.use('/uploads', express.static('uploads'));
 sequelize.sync({ force: false }).then(() => {
     console.log('All tables recreated!');
 });
-cron.schedule('0 2 * * *', async () => {
-    await axios.get('http://localhost:4000/Loan/missing-monthly-repayments');
+cron.schedule('57 12 * * *', async () => {
+    console.log('Running loan status update...');
+    await updateLoanStatuses();
 });
+app.use('/Notification', notificationsRouter);
 app.use('/Loan', LoanRoute)
 app.use('/Guarantor', GuarantorRoute)
 app.use('/Repayment', RepaymentRoute)
 app.use('/People', PeopleRoute)
 app.use('/FundMovement', fundMovementRoute)
 app.use('/Login', LoginRoute)
+app.use('/Deposit', DepositRoute)
 
 const PORT = 4000;
 app.listen(PORT, () => {
