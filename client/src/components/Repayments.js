@@ -13,10 +13,13 @@ import {
 import ModelNewPerson from "./ModelNewPerson";
 import { GetLoanStatusSummary } from '../servieces/Loans'
 import { GetPersonById, GetLoansByPerson } from '../servieces/People'
+import { useNavigate } from 'react-router-dom';
+
 function Repayment() {
     const [repayments, setRepayments] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
+    const navigate = useNavigate();
     const [selectedRepayment, setSelectedRepayment] = useState({
         loanId: '',
         amount: '',
@@ -25,15 +28,50 @@ function Repayment() {
         Guarantor: false
     });
     const [Id, setId] = useState('')
-    const [showAddPersonModal, setShowAddPersonModal] = useState(false);
     const [personId, setpersonId] = useState('')
+    const [selectedFilter, setSelectedFilter] = useState('');
+    const [filterValue, setFilterValue] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [minAmount, setMinAmount] = useState('');
+    const [maxAmount, setMaxAmount] = useState('');
+    const filteredRepayments = repayments.filter((repayment) => {
+        if (!selectedFilter) return true;
+    
+        if (selectedFilter === 'borrowerId') {
+            return repayment.loan.borrowerId.toString().includes(filterValue);
+        }
+    
+        if (selectedFilter === 'name') {
+            return repayment.loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
+    
+        if (selectedFilter === 'date') {
+            const paidDate = new Date(repayment.paidDate);
+            const from = fromDate ? new Date(fromDate) : null;
+            const to = toDate ? new Date(toDate) : null;
+            return (!from || paidDate >= from) && (!to || paidDate <= to);
+        }
+    
+        if (selectedFilter === 'amount') {
+            const amount = Number(repayment.amount);
+            const min = Number(minAmount) || 0;
+            const max = Number(maxAmount) || Infinity;
+            return amount >= min && amount <= max;
+        }
+    
+        return true;
+    });
+    
     const fetchRepayments = async () => {
         try {
             const res = await GetAllRepayments();
             console.log(res)
             setRepayments(res);
         } catch (err) {
-            console.error(err);
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
         }
     };
 
@@ -46,18 +84,28 @@ function Repayment() {
             const existingPerson = await GetPersonById(personId);
             console.log(existingPerson)
             if (!existingPerson) {
-                setShowAddPersonModal(true);
+                alert('לקוח לא קיים')
+                setpersonId('')
+                return
             }
             else {
                 const res2 = await GetLoansByPerson(personId)
-                const loan = res2.find((loan) => loan.status == 'pending' || loan.status == 'partial')
+                const loan = res2.find((loan) => loan.status == 'pending' || loan.status == 'partial' || loan.status == 'overdue' || loan.status == 'late_paid')
+                console.log(loan)
+                if (!loan) {
+                    alert("ללקוח זה אין הלוואה פעילה")
+                    setpersonId('')
+                    return
+                }
                 setSelectedRepayment({ ...selectedRepayment, loanId: loan.id })
             }
 
 
         }
-        catch (e) {
-            console.log(e)
+        catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
         }
     }
     const handleShowModal = (repayment = null) => {
@@ -103,7 +151,9 @@ function Repayment() {
             await fetchRepayments();
             handleCloseModal();
         } catch (err) {
-            console.error('שגיאה בשמירה:', err);
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
         }
     };
 
@@ -113,6 +163,9 @@ function Repayment() {
             await DeleteRepayment(id);
             await fetchRepayments();
         } catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
             console.error('שגיאה במחיקה:', err);
         }
     };
@@ -121,12 +174,108 @@ function Repayment() {
         <div className="container mt-5">
             <div className="d-flex justify-content-start mb-3">
                 <Button variant="primary" onClick={() => handleShowModal()}>הוסף תשלום</Button>
+                <Form className="mb-3">
+                    <div className="row align-items-end">
+                        <div className="col">
+                            <Form.Label>בחר שדה לסינון:</Form.Label>
+                            <Form.Select
+                                value={selectedFilter}
+                                onChange={(e) => {
+                                    setSelectedFilter(e.target.value);
+                                    setFilterValue('');
+                                    setFromDate('');
+                                    setToDate('');
+                                }}
+                            >
+                                <option value="">-- אין סינון --</option>
+                                <option value="borrowerId">תעודת זהות</option>
+                                <option value="name">שם הלווה</option>
+                                <option value="date">תאריך תשלום</option>
+                                <option value="amount">טווח סכום תשלום  </option>
+                            </Form.Select>
+                        </div>
+
+                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
+                            <div className="col">
+                                <Form.Label>הזן ערך לסינון:</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
+                                />
+                            </div>
+                        ) : null}
+
+                        {selectedFilter === 'date' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>מתאריך:</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col">
+                                    <Form.Label>עד תאריך:</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={toDate}
+                                        onChange={(e) => setToDate(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+                        {selectedFilter === 'amount' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>מסכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={minAmount}
+                                        onChange={(e) => setMinAmount(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col">
+                                    <Form.Label>עד סכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={maxAmount}
+                                        onChange={(e) => setMaxAmount(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+
+                        <div className="col-auto">
+                            <Button
+                                variant="outline-secondary"
+                                onClick={() => {
+                                    setSelectedFilter('');
+                                    setFilterValue('');
+                                    setFromDate('');
+                                    setToDate('');
+                                    setMaxAmount('')
+                                    setMinAmount('')
+                                }}
+                            >
+                                נקה סינון
+                            </Button>
+                        </div>
+                    </div>
+                </Form>
+
             </div>
 
             <Table striped bordered hover size="sm">
                 <thead>
                     <tr>
                         <th>#</th>
+                        <th>ת.ז. לווה</th>
+                        <th>שם הלווה</th>
                         <th>סכום תשלום</th>
                         <th>תאריך</th>
                         <th>סכום הלוואה</th>
@@ -138,9 +287,11 @@ function Repayment() {
                 </thead>
 
                 <tbody>
-                    {repayments.map((repayment, index) => (
+                    {filteredRepayments.map((repayment, index) => (
                         <tr key={repayment.id}>
                             <td>{index + 1}</td>
+                            <td>{repayment.loan.borrowerId}</td>
+                            <td>{repayment.loan.borrower.fullName} </td>
                             <td>{repayment.amount} ₪</td>
                             <td>{new Date(repayment.paidDate).toLocaleDateString()}</td>
                             <td>{repayment.loan?.amount || '-'}</td>
@@ -229,7 +380,6 @@ function Repayment() {
                     <Button variant="primary" onClick={handleSave}>שמור</Button>
                 </Modal.Footer>
             </Modal>
-            <ModelNewPerson showModal={showAddPersonModal} setShowModal={setShowAddPersonModal} />
 
         </div>
     );

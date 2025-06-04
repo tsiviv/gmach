@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { getNotificationsStatus, setNotificationsStatus } from '../servieces/Notification';
 import { GetOverdueLoans } from '../servieces/Loans';
+import { useNavigate } from 'react-router-dom';
+import { sendEmail } from '../servieces/Loans';
 
 export const Notification = () => {
     const [enabled, setEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [overdueLoans, setOverdueLoans] = useState([]);
-
+    const navigate = useNavigate();
     useEffect(() => {
         async function fetchData() {
             try {
@@ -14,8 +16,11 @@ export const Notification = () => {
                 const loans = await GetOverdueLoans();
                 setEnabled(status);
                 setOverdueLoans(loans);
-            } catch (e) {
-                console.error('שגיאה בטעינה:', e);
+            } catch (err) {
+                if (err.response?.status === 403 || err.response?.status === 401) {
+                    navigate('../')
+                }
+                console.error('שגיאה בטעינה:', err);
             } finally {
                 setLoading(false);
             }
@@ -29,7 +34,18 @@ export const Notification = () => {
         setEnabled(newStatus);
         await setNotificationsStatus(newStatus);
     };
-
+    const sendemail = async() => {
+        try {
+            const status = await sendEmail();
+            alert(status)
+        } catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
+            console.log(err.response.data.message)
+            alert( err.response.data.message);
+        } 
+    }
     function translateLoanStatus(status) {
         const statusMap = {
             pending: 'פעילה',
@@ -57,7 +73,7 @@ export const Notification = () => {
                 <input type="checkbox" checked={enabled} onChange={handleChange} />
                 <span>{enabled ? 'פעיל' : 'לא פעיל'}</span>
             </label>
-
+            <button onClick={sendemail}>שלח לי למייל את כל ההלוואת שלא שולמו</button>
             <hr style={{ margin: '1rem 0' }} />
             <h4>הלוואות שלא שולמו:</h4>
             {overdueLoans.length === 0 ? (

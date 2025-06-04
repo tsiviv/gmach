@@ -8,9 +8,16 @@ module.exports = {
     GetAllRepayments: async (req, res) => {
         try {
             const repayments = await Repayment.findAll({
-                model: Loan, as: 'loan'
-            }
-            );
+                include: [
+                    {
+                        model: Loan,
+                        as: 'loan', include: [{
+                            model: People,
+                            as: 'borrower'
+                        }],
+                    }
+                ]
+            });
             res.json(repayments);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -22,8 +29,15 @@ module.exports = {
             const { loanId } = req.params;
             const repayments = await Repayment.findAll({
                 where: { loanId },
-                include: [{ model: Loan, as: 'loan' }],
-            });
+                include: [
+                    {
+                        model: Loan,
+                        as: 'loan', include: [{
+                            model: People,
+                            as: 'borrower'
+                        }],
+                    }
+                ]            });
             res.json(repayments);
         } catch (err) {
             res.status(500).json({ error: err.message });

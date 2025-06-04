@@ -1,3 +1,5 @@
 {
-  "wantsNotifications": false
+  "wantsNotifications": true,
+  "requestCount": 5,
+  "resetTime": 1749061110865
 }

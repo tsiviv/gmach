@@ -1,66 +1,56 @@
-import axios from 'axios'
+import axios from 'axios';
 
-const url='http://localhost:4000'
+const url = 'http://localhost:4000';
 
-const token =sessionStorage.getItem('token')
+// צור מופע axios
+const api = axios.create({
+    baseURL: url,
+});
 
-export const GetAllPeople=async()=>{
-    const res=await axios.get(`${url}/People`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
-    return res.data;
-}
+// הוסף interceptor לכל הבקשות
+api.interceptors.request.use((config) => {
+    const token = sessionStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+}, (error) => {
+    return Promise.reject(error);
+});
 
-export const CreatePerson=async(id,fullName, phone, address, email, notes)=>{
-    const res=await axios.post(`${url}/People`,{id,fullName, phone, address, email, notes}, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
-    return res.data;
-}
+// ואז תשתמש ב־api במקום axios:
 
-export const GetPersonById=async(id)=>{
-    const res=await axios.get(`${url}/People/${id}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
+export const GetAllPeople = async () => {
+    const res = await api.get('/People');
     return res.data;
-}
+};
 
-export const GetLoansByPerson=async(id)=>{
-    const res=await axios.get(`${url}/People/GetLoansByPerson/${id}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
+export const CreatePerson = async (id, fullName, phone, address, email, notes) => {
+    const res = await api.post('/People', { id, fullName, phone, address, email, notes });
     return res.data;
-}
-export const GetLoansByGuarantor=async(id)=>{
-    const res=await axios.get(`${url}/People/GetLoansByGuarantor/${id}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
-    return res.data;
-}
+};
 
-export const DeletePerson=async(id)=>{
-    const res=await axios.delete(`${url}/People/${id}`, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
+export const GetPersonById = async (id) => {
+    const res = await api.get(`/People/${id}`);
     return res.data;
-}
-export const UpdatePerson=async(id,fullName, phone, address, email, notes)=>{
-    const res=await axios.put(`${url}/People/${id}`,{fullName, phone, address, email, notes}, {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    })
+};
+
+export const GetLoansByPerson = async (id) => {
+    const res = await api.get(`/People/GetLoansByPerson/${id}`);
     return res.data;
-}
+};
+
+export const GetLoansByGuarantor = async (id) => {
+    const res = await api.get(`/People/GetLoansByGuarantor/${id}`);
+    return res.data;
+};
+
+export const DeletePerson = async (id) => {
+    const res = await api.delete(`/People/${id}`);
+    return res.data;
+};
+
+export const UpdatePerson = async (id, fullName, phone, address, email, notes) => {
+    const res = await api.put(`/People/${id}`, { fullName, phone, address, email, notes });
+    return res.data;
+};

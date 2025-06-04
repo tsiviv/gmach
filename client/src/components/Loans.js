@@ -6,6 +6,8 @@ import Table from 'react-bootstrap/Table';
 import DocumentModal from "./DocumentModel";
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from "./ModelNewPerson";
+import { useNavigate } from 'react-router-dom';
+
 export default function Loans() {
     const [loans, setLoans] = useState([]);
     const [loan, setLoan] = useState([]);
@@ -22,6 +24,8 @@ export default function Loans() {
         numOfLoan: '',
         guarantors: []
     });
+    const token = sessionStorage.getItem('token');
+    const navigate = useNavigate();
     const [render, setrender] = useState(false)
     const [isEdit, setisEdit] = useState(false);
     const [IdUpdate, setidUpdate] = useState('')
@@ -30,6 +34,53 @@ export default function Loans() {
     const [showLoanModal, setShowLoanModal] = useState(false); // שליטה על מודל ההלוואה
     const [openRowId, setOpenRowId] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [selectedFilter, setSelectedFilter] = useState('');
+    const [filterValue, setFilterValue] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [minAmount, setMinAmount] = useState('');
+    const [maxAmount, setMaxAmount] = useState('');
+    const filteredLonas = loans.filter((loan) => {
+        if (!selectedFilter) return true;
+
+        if (selectedFilter === 'borrowerId') {
+            return loan.borrowerId.toString().includes(filterValue);
+        }
+
+        if (selectedFilter === 'name') {
+            return loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
+        if (selectedFilter === 'status') {
+            return loan.status.toLowerCase().includes(filterValue.toLowerCase());
+        }
+
+        if (selectedFilter === 'date') {
+            const fromDate2 = fromDate ? new Date(fromDate) : null;
+            if (!fromDate2) return true; // אין תאריך לסינון
+
+            if (!(loan.repaymentDay=='null')) {
+                const fromDay = fromDate2.getDate();
+                return loan.repaymentDay === fromDay;
+            } else {
+                const paidDate = new Date(loan.singleRepaymentDate);
+                return (
+                    paidDate.getFullYear() === fromDate2.getFullYear() &&
+                    paidDate.getMonth() === fromDate2.getMonth() &&
+                    paidDate.getDate() === fromDate2.getDate()
+                );
+            }
+        }
+
+
+
+        if (selectedFilter === 'amount') {
+            const amount = Number(loan.amount);
+            const min = Number(minAmount) || 0;
+            const max = Number(maxAmount) || Infinity;
+            return amount >= min && amount <= max;
+        }
+
+        return true;
+    });
 
     const handleAddGuarantor = () => {
         const lastGuarantor = newLoan.guarantors?.[newLoan.guarantors.length - 1];
@@ -51,7 +102,7 @@ export default function Loans() {
             setLoan(res);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }
@@ -65,8 +116,9 @@ export default function Loans() {
                 setLoans(allLoans);
                 console.log(allLoans)
             } catch (err) {
-                console.log(err);
-                setError("שגיאה בטעינת נתונים");
+                if (err.response?.status === 403 || err.response?.status === 401) {
+                    navigate('../')
+                } setError("שגיאה בטעינת נתונים");
             }
         }
 
@@ -95,8 +147,10 @@ export default function Loans() {
                 setNewLoan({ ...newLoan, guarantors: updated });
             }
         }
-        catch (e) {
-            console.log(e)
+        catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
         }
     }
     const handleIdBlur = async (id) => {
@@ -139,21 +193,25 @@ export default function Loans() {
                 }
             }
         }
-        catch (e) {
-            console.log(e)
+        catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
+            console.log(err)
         }
     }
     const handleSubmit = async (e) => {
         e.preventDefault();
         console.log("check", newLoan.guarantors, newLoan.documentPath)
         try {
-            isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.amountInMonth, newLoan.guarantors, newLoan.documentPath) :
-                await CreateLoan(newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentDay, newLoan.singleRepaymentDate, newLoan.amountInMonth, newLoan.guarantors, newLoan.documentPath)
+            isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath) :
+                await CreateLoan(newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath)
             setShowLoanModal(false);
             setError('')
         } catch (err) {
-            console.log(err);
-            setError(err?.response?.data);
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            } setError(err?.response?.data);
         }
     };
 
@@ -165,7 +223,7 @@ export default function Loans() {
             console.log("AD", res.guarantors)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }
@@ -197,7 +255,7 @@ export default function Loans() {
         } catch (err) {
             setError(err.response?.data || 'שגיאה לא צפויה');
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }
@@ -261,6 +319,106 @@ export default function Loans() {
         <div className="container mt-5">
             <div className="d-flex justify-content-start mb-3">
                 <Button variant="primary" onClick={() => openShowLoanModal()}>הוסף הלוואה</Button>
+                <Form className="mb-3">
+                    <div className="row align-items-end">
+                        <div className="col">
+                            <Form.Label>בחר שדה לסינון:</Form.Label>
+                            <Form.Select
+                                value={selectedFilter}
+                                onChange={(e) => {
+                                    setSelectedFilter(e.target.value);
+                                    setFilterValue('');
+                                    setFromDate('');
+                                }}
+                            >
+                                <option value="">-- אין סינון --</option>
+                                <option value="borrowerId">תעודת זהות</option>
+                                <option value="name">שם הלווה</option>
+                                <option value="date">תאריך תשלום</option>
+                                <option value="amount">טווח סכום תשלום  </option>
+                                <option value="status">סטטוס</option>
+                            </Form.Select>
+                        </div>
+
+                        {selectedFilter === 'status' ? (
+                            <div className="col">
+                                <Form.Label>הזן ערך לסינון:</Form.Label>
+                                <Form.Select
+                                    value={filterValue}
+                                    onChange={(e) => {
+                                        setFilterValue(e.target.value);
+                                    }}
+                                >
+                                    <option value="pending"> פעילה</option>
+                                    <option value="partial"> שולמה חלקית</option>
+                                    <option value="paid">שולמה </option>
+                                    <option value="overdue"> פיגור בתשלום </option>
+                                    <option value="late_paid">שולמה באיחור </option>
+                                    <option value="PaidBy_Gauartantor">שולמה על ידי ערב</option>
+                                </Form.Select>
+                            </div>
+                        ) : null}
+                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
+                            <div className="col">
+                                <Form.Label>הזן ערך לסינון:</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
+                                />
+                            </div>
+                        ) : null}
+
+                        {selectedFilter === 'date' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>תאריך:</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+                        {selectedFilter === 'amount' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>מסכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={minAmount}
+                                        onChange={(e) => setMinAmount(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col">
+                                    <Form.Label>עד סכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={maxAmount}
+                                        onChange={(e) => setMaxAmount(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+
+                        <div className="col-auto">
+                            <Button
+                                variant="outline-secondary"
+                                onClick={() => {
+                                    setSelectedFilter('');
+                                    setFilterValue('');
+                                    setFromDate('');
+                                }}
+                            >
+                                נקה סינון
+                            </Button>
+                        </div>
+                    </div>
+                </Form>
             </div>
 
             <Table striped bordered hover size="sm">
@@ -278,12 +436,12 @@ export default function Loans() {
                         <th>שם הלווה</th>
                         <th>טלפון</th>
                         <th>אימייל</th>
-                        <th>מסמך הלוואה</th>
+                        <th>שטר חוב </th>
                         <th> פעולות</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {loans.map((loanMap) => (
+                    {filteredLonas.map((loanMap) => (
                         <React.Fragment key={loanMap.id}>
                             <tr>
                                 <td>
@@ -309,7 +467,7 @@ export default function Loans() {
                                 <td>
                                     {loanMap.documentPath ? <div>
                                         <button onClick={() => setShowModal(true)}>צפייה בקובץ</button>
-                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${loanMap.documentPath}`} />
+                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${loanMap.documentPath}?token=${token}`} />
                                     </div> : '-'}
                                 </td>
                                 <td>
@@ -342,7 +500,7 @@ export default function Loans() {
                                                                 <>
                                                                     <div>
                                                                         <button onClick={() => setShowModal(true)}>צפייה בקובץ</button>
-                                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}`} />
+                                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
                                                                     </div>
                                                                 </>
                                                             )}
@@ -480,7 +638,7 @@ export default function Loans() {
                         )}
 
                         <Form.Group className="mb-3">
-                            <Form.Label>מסמך הלווה</Form.Label>
+                            <Form.Label> שטר חוב</Form.Label>
 
                             {newLoan.documentPath && typeof newLoan.documentPath === 'string' ? (
                                 <div className="mb-2">
@@ -505,7 +663,7 @@ export default function Loans() {
                                     <DocumentModal
                                         show={showModal}
                                         onClose={() => setShowModal(false)}
-                                        pdfUrl={`http://localhost:4000/${newLoan.documentPath}`}
+                                        pdfUrl={`http://localhost:4000/${newLoan.documentPath}?token=${token}`}
                                     />
                                     <Form.Label className="mt-2">החלף קובץ:</Form.Label>
                                     <Form.Control
@@ -576,7 +734,7 @@ export default function Loans() {
                                                     <span>קובץ קיים: </span>
                                                     <div>
                                                         <button onClick={() => setShowModal(true)}>הצג קובץ</button>
-                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}`} />
+                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
                                                     </div>
                                                     <button
                                                         type="button"

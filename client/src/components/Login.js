@@ -10,7 +10,8 @@ const Login = () => {
         e.preventDefault();
         try {
             const res = await LoginAdmin(email,password)
-            // sessionStorage.setItem('token', res)
+            console.log(res)
+            sessionStorage.setItem('token', res.token)
             console.log("d")
             navigate('/people')
         }

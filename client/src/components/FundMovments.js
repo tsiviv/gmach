@@ -11,11 +11,14 @@ import {
 } from '../servieces/People';
 import '../styles/fund.css'
 import ModelNewPerson from './ModelNewPerson';
+import { useNavigate } from 'react-router-dom';
+
 export default function FundMovementsPage({ isAdmin }) {
     const [movements, setMovements] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [id, setid] = useState('')
+    const navigate = useNavigate();
     const [MoneyInGmach, setMoneyInGmach] = useState(0)
     const [currentMovement, setCurrentMovement] = useState({
         amount: '',
@@ -24,9 +27,41 @@ export default function FundMovementsPage({ isAdmin }) {
         date: '',
         personId: ''
     });
-
+    const [showMoney, setShowMoney] = useState(false);
     const [showPersonModal, setShowPersonModal] = useState(false);
+    const [selectedFilter, setSelectedFilter] = useState('');
+    const [filterValue, setFilterValue] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [minAmount, setMinAmount] = useState('');
+    const [maxAmount, setMaxAmount] = useState('');
+    const filteredmovements = movements.filter((movement) => {
+        if (!selectedFilter) return true;
 
+        if (selectedFilter === 'borrowerId') {
+            return movement.loan.borrowerId.toString().includes(filterValue);
+        }
+
+        if (selectedFilter === 'name') {
+            return movement.loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
+
+        if (selectedFilter === 'date') {
+            const paidDate = new Date(movement.loan.paidDate);
+            const from = fromDate ? new Date(fromDate) : null;
+            const to = toDate ? new Date(toDate) : null;
+            return (!from || paidDate >= from) && (!to || paidDate <= to);
+        }
+
+        if (selectedFilter === 'amount') {
+            const amount = Number(movement.loan.amount);
+            const min = Number(minAmount) || 0;
+            const max = Number(maxAmount) || Infinity;
+            return amount >= min && amount <= max;
+        }
+
+        return true;
+    });
     useEffect(() => {
         loadMovements();
     }, []);
@@ -77,8 +112,11 @@ export default function FundMovementsPage({ isAdmin }) {
             countMoneyInKopa(data)
             console.log(data)
         }
-        catch (e) {
-            console.log(e)
+        catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
+            console.log(err)
         }
     };
 
@@ -118,6 +156,9 @@ export default function FundMovementsPage({ isAdmin }) {
             }
             handleClose();
         } catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
             console.error('שגיאה בשמירת תנועה:', err);
         }
     };
@@ -130,8 +171,11 @@ export default function FundMovementsPage({ isAdmin }) {
                 setShowPersonModal(true);
             }
         }
-        catch (e) {
-            console.log(e)
+        catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            }
+            console.log(err)
         }
     }
 
@@ -141,9 +185,101 @@ export default function FundMovementsPage({ isAdmin }) {
                 <Button className="mb-3" onClick={handleAddClick}>
                     הוסף תנועה
                 </Button>
-                <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
+                <Form className="mb-3">
+                    <div className="row align-items-end">
+                        <div className="col">
+                            <Form.Label>בחר שדה לסינון:</Form.Label>
+                            <Form.Select
+                                value={selectedFilter}
+                                onChange={(e) => {
+                                    setSelectedFilter(e.target.value);
+                                    setFilterValue('');
+                                    setFromDate('');
+                                    setToDate('');
+                                }}
+                            >
+                                <option value="">-- אין סינון --</option>
+                                <option value="borrowerId">תעודת זהות</option>
+                                <option value="name">שם הלווה</option>
+                                <option value="date">תאריך תשלום</option>
+                                <option value="amount">טווח סכום תשלום  </option>
+                            </Form.Select>
+                        </div>
+
+                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
+                            <div className="col">
+                                <Form.Label>הזן ערך לסינון:</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
+                                />
+                            </div>
+                        ) : null}
+
+                        {selectedFilter === 'date' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>מתאריך:</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col">
+                                    <Form.Label>עד תאריך:</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        value={toDate}
+                                        onChange={(e) => setToDate(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+                        {selectedFilter === 'amount' ? (
+                            <>
+                                <div className="col">
+                                    <Form.Label>מסכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={minAmount}
+                                        onChange={(e) => setMinAmount(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col">
+                                    <Form.Label>עד סכום:</Form.Label>
+                                    <Form.Control
+                                        type="number"
+                                        value={maxAmount}
+                                        onChange={(e) => setMaxAmount(e.target.value)}
+                                    />
+                                </div>
+                            </>
+                        )
+                            : null}
+
+                        <div className="col-auto">
+                            <Button
+                                variant="outline-secondary"
+                                onClick={() => {
+                                    setSelectedFilter('');
+                                    setFilterValue('');
+                                    setFromDate('');
+                                    setToDate('');
+                                }}
+                            >
+                                נקה סינון
+                            </Button>
+                        </div>
+                    </div>
+                </Form>
+                <button onClick={() => { setShowMoney(true) }}>הצג כסף בגמח</button>
+                {showMoney && <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
                     יש {MoneyInGmach.toLocaleString()} ₪ בגמח
-                </div>            </div>
+                </div>}        </div>
             <Table striped bordered hover>
                 <thead>
                     <tr>
@@ -156,7 +292,7 @@ export default function FundMovementsPage({ isAdmin }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {movements.map((mov) => (
+                    {filteredmovements.map((mov) => (
                         <tr key={mov.id}>
                             <td>{mov.amount}</td>
                             <td>{translateMovmemntType(mov.type)}</td>

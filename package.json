@@ -2,10 +2,15 @@
   "name": "gmach",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "start": "concurrently \"node server/api.js\" \"cd client && npm start\""
-  },
+ "scripts": {
+  "secure-start": "concurrently \"node -r ./server/load-encrypted-env.js ./server/api.js\" \"cd client && npm start\""
+
+},
+
   "devDependencies": {
     "concurrently": "^8.0.0"
+  },
+  "dependencies": {
+    "nodemailer": "^7.0.3"
   }
 }

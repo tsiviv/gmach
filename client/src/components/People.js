@@ -7,6 +7,8 @@ import { GetLoansByGuarantor, CreatePerson, DeletePerson, GetLoansByPerson, GetA
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from './ModelNewPerson';
 import { getDepositByPersonId } from '../servieces/Deposit';
+import { useNavigate } from 'react-router-dom';
+
 function People() {
     const [error, setError] = useState("");
     const [people, setPeople] = useState([]);
@@ -17,6 +19,7 @@ function People() {
     const [loans, setloans] = useState([])
     const [isEdit, setisEdit] = useState(false)
     const [deposit, setdeposit] = useState('')
+    const navigate = useNavigate();
     const [newPerson, setNewPerson] = useState({
         full_name: '',
         phone: '',
@@ -24,6 +27,28 @@ function People() {
         email: '',
         notes: '',
         id: ''
+    });
+    const [selectedFilter, setSelectedFilter] = useState('');
+    const [filterValue, setFilterValue] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [minAmount, setMinAmount] = useState('');
+    const [maxAmount, setMaxAmount] = useState('');
+    const filteredpeople = people.filter((person) => {
+        if (!selectedFilter) return true;
+
+        if (selectedFilter === 'borrowerId') {
+            return person.id.toString().includes(filterValue);
+        }
+
+        if (selectedFilter === 'name') {
+            return person.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
+        if (selectedFilter === 'email') {
+            return person.email.toLowerCase().includes(filterValue.toLowerCase());
+        }
+
+        return true;
     });
     useEffect(() => {
         const fetch = async () => {
@@ -34,6 +59,7 @@ function People() {
             } catch (err) {
                 if (err.response?.status === 403 || err.response?.status === 401) {
                     console.log("אין הרשאה");
+                    navigate('../')
                 } else {
                     console.log(err);
                 }
@@ -50,10 +76,10 @@ function People() {
             late_paid: 'שולמה באיחור',
             PaidBy_Gauartantor: 'שולמה על ידי ערב',
         };
-    
+
         return statusMap[status] || 'לא ידוע';
     }
-    
+
     const showLoans = async (id) => {
         try {
             const res = await GetLoansByPerson(id);
@@ -63,7 +89,7 @@ function People() {
             setloans(res);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }
@@ -105,7 +131,7 @@ function People() {
         } catch (err) {
             setError(err.response?.data || 'שגיאה לא צפויה');
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }
@@ -145,6 +171,53 @@ function People() {
         <div className="container mt-5">
             <div className="d-flex justify-content-start mb-3">
                 <Button variant="primary" onClick={handleShow}>הוסף איש</Button>
+                <Form className="mb-3">
+                    <div className="row align-items-end">
+                        <div className="col">
+                            <Form.Label>בחר שדה לסינון:</Form.Label>
+                            <Form.Select
+                                value={selectedFilter}
+                                onChange={(e) => {
+                                    setSelectedFilter(e.target.value);
+                                    setFilterValue('');
+                                    setFromDate('');
+                                    setToDate('');
+                                }}
+                            >
+                                <option value="">-- אין סינון --</option>
+                                <option value="borrowerId">תעודת זהות</option>
+                                <option value="name">שם הלווה</option>
+                                <option value="email">אימייל </option>
+                            </Form.Select>
+                        </div>
+
+                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' || selectedFilter === 'email' ? (
+                            <div className="col">
+                                <Form.Label>הזן ערך לסינון:</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
+                                />
+                            </div>
+                        ) : null}
+
+
+                        <div className="col-auto">
+                            <Button
+                                variant="outline-secondary"
+                                onClick={() => {
+                                    setSelectedFilter('');
+                                    setFilterValue('');
+                                }}
+                            >
+                                נקה סינון
+                            </Button>
+                        </div>
+                    </div>
+                </Form>
+
             </div>
 
             <Table striped bordered hover size="sm">
@@ -161,7 +234,7 @@ function People() {
                     </tr>
                 </thead>
                 <tbody>
-                    {people.map((p, i) => (
+                    {filteredpeople.map((p, i) => (
                         <>
                             <tr key={p.id}>
                                 <td>
@@ -221,8 +294,7 @@ function People() {
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                             >
-                                                                מסמך הלוואה
-                                                            </a>
+                                                                שטר חוב                                                            </a>
                                                             <button onClick={() => toggleGuarantors(loan.id)}>
                                                                 {openLoanId === loan.id ? "הסתר ערבים" : "הצג ערבים"}
                                                             </button>
@@ -235,8 +307,7 @@ function People() {
                                                                                 <>
                                                                                     {" - "}
                                                                                     <a href={g.documentPath} target="_blank" rel="noopener noreferrer">
-                                                                                        מסמך ערבות
-                                                                                    </a>
+                                                                                        שטר חוב ערב                                                                                    </a>
                                                                                 </>
                                                                             )}
                                                                         </li>

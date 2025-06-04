@@ -3,6 +3,7 @@ import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
 import { CreatePerson, UpdatePerson } from '../servieces/People';
+import { useNavigate } from 'react-router-dom';
 
 const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEdit }) => {
     useEffect(() => {
@@ -12,6 +13,7 @@ const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEd
             setNewPerson(updatePerson)}
      }, [showModal])
     const [error, setError] = useState("");
+    const navigate = useNavigate();
     const [newPerson, setNewPerson] = useState({
         full_name: '',
         phone: '',
@@ -50,7 +52,7 @@ const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEd
         } catch (err) {
             setError(err.response.data)
             if (err.response?.status === 403 || err.response?.status === 401) {
-                console.log("אין הרשאה");
+                navigate('../')
             } else {
                 console.log(err);
             }

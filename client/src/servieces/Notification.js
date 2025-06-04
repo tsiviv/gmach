@@ -1,17 +1,28 @@
 import axios from 'axios';
 
-const url = 'http://localhost:4000'; // בהתאם לשרת שלך
+const url = 'http://localhost:4000';
 
-const getAuthHeaders = () => ({
-  headers: {
-    Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-  },
+// יצירת מופע axios
+const api = axios.create({
+  baseURL: url,
 });
+
+// Interceptor שמוסיף את ה-Authorization Header אוטומטית
+api.interceptors.request.use(
+  (config) => {
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 // קבלת סטטוס ההתראות הנוכחי
 export const getNotificationsStatus = async () => {
   try {
-    const res = await axios.get(`${url}/Notification/get-notifications`, getAuthHeaders());
+    const res = await api.get('/Notification/get-notifications');
     return res.data.enabled;
   } catch (error) {
     console.error('שגיאה בקבלת סטטוס התראות:', error);
@@ -22,11 +33,7 @@ export const getNotificationsStatus = async () => {
 // עדכון סטטוס ההתראות
 export const setNotificationsStatus = async (enabled) => {
   try {
-    const res = await axios.post(
-      `${url}/Notification/set-notifications`,
-      { enabled },
-      getAuthHeaders()
-    );
+    const res = await api.post('/Notification/set-notifications', { enabled });
     return res.data;
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס התראות:', error);

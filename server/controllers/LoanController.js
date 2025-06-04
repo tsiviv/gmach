@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const FundMovement = require('../models/FundMovement');
 const moment = require('moment');
-
+const { sendEmail } = require('../controllers/emailer')
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const tmpPath = 'uploads/tmp';
@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-module.exports = {
+const controller = {
     // שליפת כל ההלוואות
     GetAllLoans: async (req, res) => {
         try {
@@ -354,7 +354,7 @@ module.exports = {
     // הלוואות שפג תוקפן
     GetOverdueLoans: async (req, res) => {
         try {
-console.log("overdueLoans")
+            console.log("overdueLoans")
             const overdueLoans = await Loan.findAll({
                 where: {
                     status: 'overdue'
@@ -448,7 +448,23 @@ console.log("overdueLoans")
             res.status(500).json({ error: err.message });
         }
     },
-      updateLoanStatuses: async () => {
+    updateLoanStatusApi: async function (req, res) {
+        try {
+            const result = await controller.updateLoanStatuses();
+            res.json(result);
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    },
+    sendEmail: async function (req, res) {
+        try {
+            await sendEmail('s0534106361@gmail.com', 'hi', "hello yakov")
+            res.json("אימייל נשלח");
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    },
+    updateLoanStatuses: async function () {
         const loans = await Loan.findAll({
             where: {
                 status: { [Op.notIn]: ['paid'] },
@@ -494,4 +510,5 @@ console.log("overdueLoans")
         }
     }
 
-}    
+}
+module.exports = controller;

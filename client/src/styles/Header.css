@@ -11,3 +11,9 @@
     margin-right: 120;
     gap: 10%;
 }
+.header a,
+.header a:visited,
+.header a:hover,
+.header a:active {
+  text-decoration: none !important;
+}
