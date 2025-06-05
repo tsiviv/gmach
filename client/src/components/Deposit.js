@@ -137,9 +137,9 @@ export default function Deposit() {
     };
 
     return (
-        <div className="p-3">
+        <div className="container pt-5">
             <div className='header-fund'>
-                <Button className="mb-3" onClick={handleAdd}>
+                <Button variant="warning" className="mb-3 ms-5" onClick={handleAdd}>
                     הוסף הפקדה
                 </Button>
                 <Form className="mb-3">

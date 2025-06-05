@@ -34,7 +34,7 @@ export const Notification = () => {
         setEnabled(newStatus);
         await setNotificationsStatus(newStatus);
     };
-    const sendemail = async() => {
+    const sendemail = async () => {
         try {
             const status = await sendEmail();
             alert(status)
@@ -43,8 +43,16 @@ export const Notification = () => {
                 navigate('../')
             }
             console.log(err.response.data.message)
-            alert( err.response.data.message);
-        } 
+            alert("שגיאה בשליחת מייל");
+        }
+    }
+    function translaterepaymentType(repaymentType) {
+        const statusMap = {
+            monthly: 'חודשי',
+            once: 'חד פעמי',
+        };
+
+        return statusMap[repaymentType] || 'לא ידוע';
     }
     function translateLoanStatus(status) {
         const statusMap = {
@@ -73,7 +81,7 @@ export const Notification = () => {
                 <input type="checkbox" checked={enabled} onChange={handleChange} />
                 <span>{enabled ? 'פעיל' : 'לא פעיל'}</span>
             </label>
-            <button onClick={sendemail}>שלח לי למייל את כל ההלוואת שלא שולמו</button>
+            <button onClick={sendemail}>שלח לי למייל עכשיו את כל ההלוואת שלא שולמו</button>
             <hr style={{ margin: '1rem 0' }} />
             <h4>הלוואות שלא שולמו:</h4>
             {overdueLoans.length === 0 ? (
@@ -91,10 +99,56 @@ export const Notification = () => {
                             <p>לווה: {loan.borrower?.fullName}</p>
                             <p>טלפון: {loan.borrower?.phone}</p>
                             <p>סכום הלוואה: ₪{loan.amount.toLocaleString()}</p>
-                            <p>סכום חודשי: ₪{loan.amountInMonth.toLocaleString()}</p>
                             <p>תאריך התחלה: {new Date(loan.startDate).toLocaleDateString()}</p>
+                            <p> סוג החזר: {translaterepaymentType(loan.repaymentType)}</p>
+                            {loan.repaymentType=='monthly'?<><p>יום לתשלום בחודש : {loan.repaymentDay}</p>
+                            <p>סכום חודשי: ₪{loan.amountInMonth.toLocaleString()}</p></>:
+                            <p>תאריך החזר: {new Date(loan.singleRepaymentDate).toLocaleDateString()}</p>}
                             <p>מספר איחורים: {loan.lateCount}</p>
                             <p>סטטוס: <strong style={{ color: 'red' }}>{translateLoanStatus(loan.status)}</strong></p>
+
+                            {/* ערבים */}
+                            {loan.guarantors?.length > 0 && (
+                                <div style={{ marginTop: '10px' }}>
+                                    <h5 style={{ margin: '5px 0' }}>ערבים:</h5>
+                                    <ul style={{ paddingRight: '20px' }}>
+                                        {loan.guarantors.map(g => (
+                                            <li key={g.id}>
+                                                {g.guarantor?.fullName || 'לא ידוע'} ({g.PeopleId})
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* תשלומים */}
+                            {loan.repayments?.length > 0 && (
+                                <div style={{ marginTop: '10px' }}>
+                                    <h5 style={{ margin: '5px 0' }}>תשלומים שבוצעו:</h5>
+                                    <table style={{
+                                        width: '100%',
+                                        borderCollapse: 'collapse',
+                                        fontSize: '0.9em'
+                                    }}>
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#f0f0f0' }}>
+                                                <th style={{ border: '1px solid #ccc', padding: '4px' }}>תאריך</th>
+                                                <th style={{ border: '1px solid #ccc', padding: '4px' }}>סכום</th>
+                                                <th style={{ border: '1px solid #ccc', padding: '4px' }}>הערות</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {loan.repayments.map(r => (
+                                                <tr key={r.id}>
+                                                    <td style={{ border: '1px solid #ccc', padding: '4px' }}>{new Date(r.paidDate).toLocaleDateString()}</td>
+                                                    <td style={{ border: '1px solid #ccc', padding: '4px' }}>₪{r.amount.toLocaleString()}</td>
+                                                    <td style={{ border: '1px solid #ccc', padding: '4px' }}>{r.notes || ''}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

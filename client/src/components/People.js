@@ -8,8 +8,10 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from './ModelNewPerson';
 import { getDepositByPersonId } from '../servieces/Deposit';
 import { useNavigate } from 'react-router-dom';
+import DocumentModal from "./DocumentModel";
 
 function People() {
+    const token = sessionStorage.getItem('token');
     const [error, setError] = useState("");
     const [people, setPeople] = useState([]);
     const [showModal, setShowModal] = useState(false);
@@ -85,7 +87,7 @@ function People() {
             const res = await GetLoansByPerson(id);
             const res2 = await getDepositByPersonId(id);
             setdeposit(res2)
-            console.log(res2)
+            console.log(res)
             setloans(res);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
@@ -168,9 +170,9 @@ function People() {
     };
 
     return (
-        <div className="container mt-5">
+        <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
-                <Button variant="primary" onClick={handleShow}>הוסף איש</Button>
+                <Button variant="warning" className="mb-3 ms-5 p-4" onClick={handleShow}>הוסף איש</Button>
                 <Form className="mb-3">
                     <div className="row align-items-end">
                         <div className="col">
@@ -220,7 +222,7 @@ function People() {
 
             </div>
 
-            <Table striped bordered hover size="sm">
+            <Table striped bordered hover>
                 <thead>
                     <tr>
                         <th>#</th>
@@ -239,7 +241,7 @@ function People() {
                             <tr key={p.id}>
                                 <td>
                                     <Button
-                                        variant="success"
+                                        variant="dark"
                                         size="sm"
                                         onClick={() =>
                                             showLoans(p.id)
@@ -288,16 +290,34 @@ function People() {
                                                             ) : (
                                                                 <span>{loan.lateCount} איחורים בתשלום</span>
                                                             )}
+
+                                                            {/* תשלומים */}
+                                                            {loan.repayments && loan.repayments.length > 0 && (
+                                                                <table className="table table-sm mt-2">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>תאריך תשלום</th>
+                                                                            <th>סכום</th>
+                                                                            <th>הערות</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {loan.repayments.map((r) => (
+                                                                            <tr key={r.id}>
+                                                                                <td>{new Date(r.paidDate).toLocaleDateString('he-IL')}</td>
+                                                                                <td>{r.amount} ש"ח</td>
+                                                                                <td>{r.notes || '-'}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            )}
+
                                                             <br />
-                                                            <a
-                                                                href={`http://localhost:4000/${loan.documentPath}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                            >
-                                                                שטר חוב                                                            </a>
-                                                            <button onClick={() => toggleGuarantors(loan.id)}>
+                                                            <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${loan.documentPath}?token=${token}`} />
+                                                            {loan.guarantors.length > 0 &&<Button className="btn btn-dark" onClick={() => toggleGuarantors(loan.id)}>
                                                                 {openLoanId === loan.id ? "הסתר ערבים" : "הצג ערבים"}
-                                                            </button>
+                                                            </Button>}
                                                             {openLoanId === loan.id && loan.guarantors && loan.guarantors.length > 0 && (
                                                                 <ul style={{ marginTop: "0.5em" }}>
                                                                     {loan.guarantors.map((g, idx) => (
@@ -306,17 +326,19 @@ function People() {
                                                                             {g.documentPath && (
                                                                                 <>
                                                                                     {" - "}
-                                                                                    <a href={g.documentPath} target="_blank" rel="noopener noreferrer">
-                                                                                        שטר חוב ערב                                                                                    </a>
+                                                                                    <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
+                                                                                    <Button className="btn btn-dark" onClick={() => setShowModal(true)}> שטר חוב ערב</Button>
                                                                                 </>
                                                                             )}
                                                                         </li>
                                                                     ))}
                                                                 </ul>
+
                                                             )}
                                                         </li>
                                                     ))}
                                                 </ul>
+
                                                 {deposit && (
                                                     <p>
                                                         {deposit.deposit_amount > 0 && `המשתמש הפקיד ${deposit.deposit_amount} ש"ח`}

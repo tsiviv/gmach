@@ -35,34 +35,35 @@ function Repayment() {
     const [toDate, setToDate] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
+    const [loanguarantors, setloanguarantors] = useState([])
     const filteredRepayments = repayments.filter((repayment) => {
         if (!selectedFilter) return true;
-    
+
         if (selectedFilter === 'borrowerId') {
             return repayment.loan.borrowerId.toString().includes(filterValue);
         }
-    
+
         if (selectedFilter === 'name') {
             return repayment.loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
         }
-    
+
         if (selectedFilter === 'date') {
             const paidDate = new Date(repayment.paidDate);
             const from = fromDate ? new Date(fromDate) : null;
             const to = toDate ? new Date(toDate) : null;
             return (!from || paidDate >= from) && (!to || paidDate <= to);
         }
-    
+
         if (selectedFilter === 'amount') {
             const amount = Number(repayment.amount);
             const min = Number(minAmount) || 0;
             const max = Number(maxAmount) || Infinity;
             return amount >= min && amount <= max;
         }
-    
+
         return true;
     });
-    
+
     const fetchRepayments = async () => {
         try {
             const res = await GetAllRepayments();
@@ -91,6 +92,7 @@ function Repayment() {
             else {
                 const res2 = await GetLoansByPerson(personId)
                 const loan = res2.find((loan) => loan.status == 'pending' || loan.status == 'partial' || loan.status == 'overdue' || loan.status == 'late_paid')
+                setloanguarantors(loan.guarantors)
                 console.log(loan)
                 if (!loan) {
                     alert("ללקוח זה אין הלוואה פעילה")
@@ -171,9 +173,9 @@ function Repayment() {
     };
 
     return (
-        <div className="container mt-5">
-            <div className="d-flex justify-content-start mb-3">
-                <Button variant="primary" onClick={() => handleShowModal()}>הוסף תשלום</Button>
+        <div className="container pt-5">
+            <div className="d-flex  mb-3">
+                <Button variant="warning" className="mb-3 ms-5" onClick={() => handleShowModal()}>הוסף תשלום</Button>
                 <Form className="mb-3">
                     <div className="row align-items-end">
                         <div className="col">
@@ -270,7 +272,7 @@ function Repayment() {
 
             </div>
 
-            <Table striped bordered hover size="sm">
+            <Table striped bordered hover >
                 <thead>
                     <tr>
                         <th>#</th>
@@ -339,7 +341,7 @@ function Repayment() {
                                 onChange={(e) => setSelectedRepayment({ ...selectedRepayment, Guarantor: e.target.value })}
                             >
                                 <option value={false} >הלווה</option>
-                                <option value={true}>ערב</option>
+                                {loanguarantors.length > 0 && <option value={true}>ערב</option>}
                             </Form.Select>
                         </Form.Group>
                         <Form.Group className="mb-3">

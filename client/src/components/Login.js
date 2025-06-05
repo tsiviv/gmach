@@ -22,7 +22,7 @@ const Login = () => {
     }
 
     return <>
-        <div className="container mt-5" style={{ maxWidth: 400 }} dir="rtl">
+        <div className="container pt-5" style={{ maxWidth: 400 }} dir="rtl">
             <h3 className="mb-4">התחברות למערכת</h3>
             <form onSubmit={fetch}>
                 <div className="mb-3">

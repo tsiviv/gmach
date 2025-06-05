@@ -32,29 +32,24 @@ export default function FundMovementsPage({ isAdmin }) {
     const [selectedFilter, setSelectedFilter] = useState('');
     const [filterValue, setFilterValue] = useState('');
     const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
     const filteredmovements = movements.filter((movement) => {
         if (!selectedFilter) return true;
 
         if (selectedFilter === 'borrowerId') {
-            return movement.loan.borrowerId.toString().includes(filterValue);
+            return movement.person.id.toString().includes(filterValue);
         }
 
-        if (selectedFilter === 'name') {
-            return movement.loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
-        }
 
         if (selectedFilter === 'date') {
-            const paidDate = new Date(movement.loan.paidDate);
-            const from = fromDate ? new Date(fromDate) : null;
-            const to = toDate ? new Date(toDate) : null;
-            return (!from || paidDate >= from) && (!to || paidDate <= to);
+            console.log(fromDate, "F", movement.date)
+            if (!fromDate) return true; // אין תאריך לסינון
+            return movement.date === fromDate;
         }
 
         if (selectedFilter === 'amount') {
-            const amount = Number(movement.loan.amount);
+            const amount = Number(movement.amount);
             const min = Number(minAmount) || 0;
             const max = Number(maxAmount) || Infinity;
             return amount >= min && amount <= max;
@@ -81,18 +76,7 @@ export default function FundMovementsPage({ isAdmin }) {
 
         setMoneyInGmach(sum);
     }
-    function translateLoanStatus(status) {
-        const statusMap = {
-            pending: 'ממתינה',
-            partial: 'שולמה חלקית',
-            paid: 'שולמה',
-            overdue: 'פיגור',
-            late_paid: 'שולמה באיחור',
-            PaidBy_Gauartantor: 'שולמה על ידי ערב',
-        };
 
-        return statusMap[status] || 'לא ידוע';
-    }
     function translateMovmemntType(MovmemntType) {
         const statusMap = {
             repayment_received: 'תשלום על הלוואה',
@@ -181,206 +165,197 @@ export default function FundMovementsPage({ isAdmin }) {
 
     return (
         <>
-            <div className='header-fund'>
-                <Button className="mb-3" onClick={handleAddClick}>
-                    הוסף תנועה
-                </Button>
-                <Form className="mb-3">
-                    <div className="row align-items-end">
-                        <div className="col">
-                            <Form.Label>בחר שדה לסינון:</Form.Label>
-                            <Form.Select
-                                value={selectedFilter}
-                                onChange={(e) => {
-                                    setSelectedFilter(e.target.value);
-                                    setFilterValue('');
-                                    setFromDate('');
-                                    setToDate('');
-                                }}
-                            >
-                                <option value="">-- אין סינון --</option>
-                                <option value="borrowerId">תעודת זהות</option>
-                                <option value="name">שם הלווה</option>
-                                <option value="date">תאריך תשלום</option>
-                                <option value="amount">טווח סכום תשלום  </option>
-                            </Form.Select>
-                        </div>
-
-                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
+            <div className='container pt-5'>
+                <div className='header-fund '>
+                    <Button variant="warning" className="mb-3" onClick={handleAddClick}>
+                        הוסף תנועה
+                    </Button>
+                    <Form className="mb-3">
+                        <div className="row align-items-end">
                             <div className="col">
-                                <Form.Label>הזן ערך לסינון:</Form.Label>
-                                <Form.Control
-                                    type="text"
-                                    value={filterValue}
-                                    onChange={(e) => setFilterValue(e.target.value)}
-                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
-                                />
+                                <Form.Label>בחר שדה לסינון:</Form.Label>
+                                <Form.Select
+                                    value={selectedFilter}
+                                    onChange={(e) => {
+                                        setSelectedFilter(e.target.value);
+                                        setFilterValue('');
+                                        setFromDate('');
+                                    }}
+                                >
+                                    <option value="">-- אין סינון --</option>
+                                    <option value="borrowerId">תעודת זהות</option>
+                                    <option value="date">תאריך תשלום</option>
+                                    <option value="amount">טווח סכום תשלום  </option>
+                                </Form.Select>
                             </div>
-                        ) : null}
 
-                        {selectedFilter === 'date' ? (
-                            <>
+                            {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
                                 <div className="col">
-                                    <Form.Label>מתאריך:</Form.Label>
+                                    <Form.Label>הזן ערך לסינון:</Form.Label>
                                     <Form.Control
-                                        type="date"
-                                        value={fromDate}
-                                        onChange={(e) => setFromDate(e.target.value)}
+                                        type="text"
+                                        value={filterValue}
+                                        onChange={(e) => setFilterValue(e.target.value)}
+                                        placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
                                     />
                                 </div>
-                                <div className="col">
-                                    <Form.Label>עד תאריך:</Form.Label>
-                                    <Form.Control
-                                        type="date"
-                                        value={toDate}
-                                        onChange={(e) => setToDate(e.target.value)}
-                                    />
-                                </div>
-                            </>
-                        )
-                            : null}
-                        {selectedFilter === 'amount' ? (
-                            <>
-                                <div className="col">
-                                    <Form.Label>מסכום:</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={minAmount}
-                                        onChange={(e) => setMinAmount(e.target.value)}
-                                    />
-                                </div>
-                                <div className="col">
-                                    <Form.Label>עד סכום:</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={maxAmount}
-                                        onChange={(e) => setMaxAmount(e.target.value)}
-                                    />
-                                </div>
-                            </>
-                        )
-                            : null}
+                            ) : null}
 
-                        <div className="col-auto">
-                            <Button
-                                variant="outline-secondary"
-                                onClick={() => {
-                                    setSelectedFilter('');
-                                    setFilterValue('');
-                                    setFromDate('');
-                                    setToDate('');
-                                }}
-                            >
-                                נקה סינון
-                            </Button>
+                            {selectedFilter === 'date' ? (
+                                <>
+                                    <div className="col">
+                                        <Form.Label> תאריך:</Form.Label>
+                                        <Form.Control
+                                            type="date"
+                                            value={fromDate}
+                                            onChange={(e) => setFromDate(e.target.value)}
+                                        />
+                                    </div>
+                                </>
+                            )
+                                : null}
+                            {selectedFilter === 'amount' ? (
+                                <>
+                                    <div className="col">
+                                        <Form.Label>מסכום:</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={minAmount}
+                                            onChange={(e) => setMinAmount(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="col">
+                                        <Form.Label>עד סכום:</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={maxAmount}
+                                            onChange={(e) => setMaxAmount(e.target.value)}
+                                        />
+                                    </div>
+                                </>
+                            )
+                                : null}
+
+                            <div className="col-auto">
+                                <Button
+                                    variant="outline-secondary"
+                                    onClick={() => {
+                                        setSelectedFilter('');
+                                        setFilterValue('');
+                                        setFromDate('');
+                                    }}
+                                >
+                                    נקה סינון
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                </Form>
-                <button onClick={() => { setShowMoney(true) }}>הצג כסף בגמח</button>
-                {showMoney && <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
-                    יש {MoneyInGmach.toLocaleString()} ₪ בגמח
-                </div>}        </div>
-            <Table striped bordered hover>
-                <thead>
-                    <tr>
-                        <th>סכום</th>
-                        <th>סוג</th>
-                        <th>תיאור</th>
-                        <th>תאריך</th>
-                        <th>ת"ז</th>
-                        <th>פעולות</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredmovements.map((mov) => (
-                        <tr key={mov.id}>
-                            <td>{mov.amount}</td>
-                            <td>{translateMovmemntType(mov.type)}</td>
-                            <td>{mov.description}</td>
-                            <td>{mov.date}</td>
-                            <td>{mov.personId}</td>
-                            <td>
-                                {!(mov.type == 'loan_given' || mov.type == 'repayment_received' || mov.type == 'deposit' || mov.type == 'pull_deposit' || mov.type == 'repayment') && <Button size="sm" onClick={() => handleEditClick(mov)}>
-                                    ערוך
-                                </Button>}
-                            </td>
+                    </Form>
+                    {!showMoney ? <Button variant="warning" className="mb-3" onClick={() => { setShowMoney(true) }}>הצג כסף בגמח</Button>
+                        : <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
+                            יש {MoneyInGmach.toLocaleString()} ₪ בגמח
+                        </div>}        </div>
+                <Table striped bordered hover>
+                    <thead>
+                        <tr>
+                            <th>סכום</th>
+                            <th>סוג</th>
+                            <th>תיאור</th>
+                            <th>תאריך</th>
+                            <th>ת"ז</th>
+                            <th>פעולות</th>
                         </tr>
-                    ))}
-                </tbody>
-            </Table>
+                    </thead>
+                    <tbody>
+                        {filteredmovements.map((mov) => (
+                            <tr key={mov.id}>
+                                <td>{mov.amount}</td>
+                                <td>{translateMovmemntType(mov.type)}</td>
+                                <td>{mov.description}</td>
+                                <td>{mov.date}</td>
+                                <td>{mov.personId}</td>
+                                <td>
+                                    {!(mov.type == 'loan_given' || mov.type == 'repayment_received' || mov.type == 'deposit' || mov.type == 'pull_deposit' || mov.type == 'repayment') && <Button size="sm" onClick={() => handleEditClick(mov)}>
+                                        ערוך
+                                    </Button>}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </Table>
 
-            <Modal show={showModal} onHide={handleClose} dir="rtl">
-                <Modal.Header closeButton>
-                    <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <Form onSubmit={submitMovement} className="text-end">
-                        <Form.Group>
-                            <Form.Label>סכום</Form.Label>
-                            <Form.Control
-                                type="number"
-                                name="amount"
-                                value={currentMovement.amount}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Form.Group>
-
-                        <Form.Group>
-                            <Form.Label>סוג</Form.Label>
-                            <Form.Control
-                                as="select"
-                                name="type"
-                                value={currentMovement.type}
-                                onChange={handleChange}
-                                required
-                            >
-                                <option value="manual_adjustment">התאמה ידנית</option>
-                                <option value="donation">תרומה</option>
-                            </Form.Control>
-                        </Form.Group>
-
-                        <Form.Group>
-                            <Form.Label>תיאור</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name="description"
-                                value={currentMovement.description}
-                                onChange={handleChange}
-                            />
-                        </Form.Group>
-
-                        <Form.Group>
-                            <Form.Label>תאריך</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="date"
-                                value={currentMovement.date}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Form.Group>
-
-                        {currentMovement.type !== 'manual_adjustment' && (
+                <Modal show={showModal} onHide={handleClose} dir="rtl">
+                    <Modal.Header closeButton>
+                        <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <Form onSubmit={submitMovement} className="text-end">
                             <Form.Group>
-                                <Form.Label>תעודת זהות</Form.Label>
+                                <Form.Label>סכום</Form.Label>
                                 <Form.Control
-                                    type="text"
-                                    name="personId"
-                                    value={currentMovement.personId}
+                                    type="number"
+                                    name="amount"
+                                    value={currentMovement.amount}
                                     onChange={handleChange}
-                                    onBlur={() => handleIdBlur(currentMovement.personId)}
+                                    required
                                 />
                             </Form.Group>
-                        )}
 
-                        <Button type="submit" variant="primary" className="mt-3">
-                            {isEdit ? 'עדכן' : 'הוסף'}
-                        </Button>
-                    </Form>
-                </Modal.Body>
-            </Modal>
-            <ModelNewPerson showModal={showPersonModal} setShowModal={setShowPersonModal} />
+                            <Form.Group>
+                                <Form.Label>סוג</Form.Label>
+                                <Form.Control
+                                    as="select"
+                                    name="type"
+                                    value={currentMovement.type}
+                                    onChange={handleChange}
+                                    required
+                                >
+                                    <option value="manual_adjustment">התאמה ידנית</option>
+                                    <option value="donation">תרומה</option>
+                                </Form.Control>
+                            </Form.Group>
+
+                            <Form.Group>
+                                <Form.Label>תיאור</Form.Label>
+                                <Form.Control
+                                    type="text"
+                                    name="description"
+                                    value={currentMovement.description}
+                                    onChange={handleChange}
+                                />
+                            </Form.Group>
+
+                            <Form.Group>
+                                <Form.Label>תאריך</Form.Label>
+                                <Form.Control
+                                    type="date"
+                                    name="date"
+                                    value={currentMovement.date}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Form.Group>
+
+                            {currentMovement.type !== 'manual_adjustment' && (
+                                <Form.Group>
+                                    <Form.Label>תעודת זהות</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        name="personId"
+                                        value={currentMovement.personId}
+                                        onChange={handleChange}
+                                        onBlur={() => handleIdBlur(currentMovement.personId)}
+                                    />
+                                </Form.Group>
+                            )}
+
+                            <Button type="submit" variant="primary" className="mt-3">
+                                {isEdit ? 'עדכן' : 'הוסף'}
+                            </Button>
+                        </Form>
+                    </Modal.Body>
+                </Modal>
+                <ModelNewPerson showModal={showPersonModal} setShowModal={setShowPersonModal} />
+            </div>
         </>
     );
 }

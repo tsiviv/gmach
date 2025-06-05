@@ -2,7 +2,7 @@ const People = require('../models/People');
 const Guarantor = require('../models/Guarantor');
 const Loan = require('../models/Loan');
 const FundMovement = require('../models/FundMovement');
-
+const Repayment =require('../models/Repayment')
 module.exports = {
   // קבלת כל האנשים
   GetAllPeople: async (req, res) => {
@@ -37,6 +37,10 @@ module.exports = {
             as: 'borrower',
             attributes: ['fullName']
           },
+          {
+            model: Repayment,
+            as: 'repayments'
+        },
           {
             model: Guarantor,
             as: 'guarantors',

@@ -354,10 +354,10 @@ const controller = {
     // הלוואות שפג תוקפן
     GetOverdueLoans: async (req, res) => {
         try {
-            console.log("overdueLoans")
-            const overdueLoans = await Loan.findAll({
+            // שולפים גם הלוואות עם סטטוס 'overdue' וגם 'partial'
+            const loans = await Loan.findAll({
                 where: {
-                    status: 'overdue'
+                    status: { [Op.in]: ['partial', 'overdue'] }
                 },
                 include: [
                     {
@@ -381,9 +381,10 @@ const controller = {
                 ]
             });
 
-            res.json(overdueLoans);
+            res.json(loans);
         } catch (err) {
-            res.status(500).json({ error: 'שגיאה בשליפת הלוואות שפג תוקפן' });
+            console.error(err);
+            res.status(500).json({ error: 'שגיאה בשליפת הלוואות בפיגור' });
         }
     },
 
@@ -407,9 +408,12 @@ const controller = {
 
             borrowerLoans.forEach(loan => {
                 const status = loan.status;
-                if (status === 'pending' || status === 'partial') {
+                if (status === 'pending' ) {
                     borrowerLoansByStatus.pendingOrPartial.push(loan);
-                } else if (borrowerLoansByStatus[status]) {
+                } 
+                else if(status === 'partial'){
+                    borrowerLoansByStatus['overdue'].push(loan);
+                }else if (borrowerLoansByStatus[status]) {
                     borrowerLoansByStatus[status].push(loan);
                 }
             });
@@ -432,7 +436,7 @@ const controller = {
                 const loan = link.Loan;
                 if (!loan) return;
 
-                if (loan.status === 'overdue') {
+                if (loan.status === 'overdue'||loan.status === 'partial') {
                     guarantorLoansByStatus.overdue.push(loan);
                 } else if (loan.status === 'late_paid') {
                     guarantorLoansByStatus.late_paid.push(loan);
@@ -458,10 +462,12 @@ const controller = {
     },
     sendEmail: async function (req, res) {
         try {
-            await sendEmail('s0534106361@gmail.com', 'hi', "hello yakov")
+            await sendEmail()
+            console.log("Dsf")
             res.json("אימייל נשלח");
         } catch (e) {
-            res.status(500).json({ error: e.message });
+            console.log("ert4", e)
+            res.status(500).json({ error: e });
         }
     },
     updateLoanStatuses: async function () {
@@ -471,44 +477,109 @@ const controller = {
             }
         });
 
+        const today = moment();
+
         for (const loan of loans) {
             const repayments = await Repayment.findAll({
                 where: { loanId: loan.id }
             });
+            const totalPaid = repayments.reduce((sum, r) => sum + r.amount, 0);
 
             if (loan.repaymentType === 'monthly') {
-                const monthsPassed = moment().diff(moment(loan.startDate), 'months');
+                const startDate = moment(loan.startDate);
+                const expectedDay = loan.repaymentDay || startDate.date();
+                const firstDueDate = startDate.clone().add(1, 'month').date(expectedDay);
+                let dueDate = firstDueDate.clone();
+
+                // חישוב איחורים אמיתיים לפי תאריך
+                const sortedRepayments = [...repayments].sort((a, b) =>
+                    new Date(a.paidDate) - new Date(b.paidDate)
+                );
+
                 let lateMonths = 0;
 
-                for (let i = 0; i <= monthsPassed; i++) {
-                    const monthStart = moment(loan.startDate).add(i, 'months').startOf('month');
-                    const monthEnd = moment(loan.startDate).add(i, 'months').endOf('month');
-
-                    const paidInThisMonth = repayments.some(repayment =>
-                        moment(repayment.paidDate).isBetween(monthStart, monthEnd, null, '[]')
+                while (dueDate.isSameOrBefore(today, 'day')) {
+                    const payment = sortedRepayments.find(r =>
+                        moment(r.paidDate).isSameOrBefore(dueDate, 'day')
                     );
 
-                    if (!paidInThisMonth) {
+                    if (payment) {
+                        // להסיר את התשלום הזה כדי שלא ייחשב שוב
+                        const index = sortedRepayments.indexOf(payment);
+                        if (index !== -1) sortedRepayments.splice(index, 1);
+                    } else {
                         lateMonths++;
                     }
+
+                    dueDate.add(1, 'month');
                 }
 
-                // Update lateCount only if changed
-                if (loan.lateCount !== lateMonths) {
+                // חישוב סכום שהיה אמור להישלם
+                const monthsDue = dueDate.diff(firstDueDate, 'months');
+                const expectedAmount = monthsDue * loan.amountInMonth;
+                const unpaidAmount = expectedAmount - totalPaid;
+
+                // עדכון כמות איחורים רק אם השתנתה
+                const shouldUpdateLateCount = lateMonths !== loan.lateCount;
+                if (shouldUpdateLateCount) {
                     loan.lateCount = lateMonths;
-                    loan.status = lateMonths > 0 ? 'overdue' : 'partial';
+                }
+
+                let newStatus;
+                if (lateMonths > 0 && totalPaid === 0) {
+                    newStatus = 'overdue';
+                } else if (totalPaid > 0 && totalPaid < expectedAmount) {
+                    newStatus = 'partial';
+                }
+                else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths > 0) {
+                    newStatus = 'late_paid';
+                }
+                else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths == 0 && loan.amount > totalPaid) {
+                    newStatus = 'pending';
+                }
+                else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths == 0 && loan.amount == totalPaid) {
+                    newStatus = 'paid';
+                }
+                else {
+                    newStatus = loan.status;
+                }
+
+                const shouldUpdateStatus = loan.status !== newStatus;
+                if (shouldUpdateLateCount || shouldUpdateStatus) {
+                    loan.status = newStatus;
                     await loan.save();
                 }
 
             } else if (loan.repaymentType === 'once') {
-                const paid = repayments.length > 0;
-                if (!paid && moment().isAfter(loan.singleRepaymentDate)) {
-                    loan.status = 'overdue';
-                    await loan.save();
+                const isOverdue = today.isAfter(loan.singleRepaymentDate);
+                if (isOverdue && totalPaid === 0) {
+                    newStatus = 'overdue';
+                } else if (totalPaid > 0 && totalPaid < loan.amount && isOverdue) {
+                    newStatus = 'partial';
                 }
+                else if (!isOverdue && totalPaid == loan.amount && loan.status !== 'PaidBy_Gauartantor') {
+                    newStatus = 'paid';
+                }
+                else if (isOverdue && totalPaid == loan.amount && loan.status !== 'PaidBy_Gauartantor') {
+                    newStatus = 'late_paid';
+                }
+                else if (!isOverdue && totalPaid !== loan.amount) {
+                    newStatus = 'pending';
+                }
+
+                else {
+                    newStatus = loan.status;
+                }
+
+                loan.lateCount = (newStatus == 'overdue' || newStatus == 'partial') ? 1 : 0;
+                loan.status = newStatus;
+                await loan.save();
             }
         }
     }
+
+
+
 
 }
 module.exports = controller;

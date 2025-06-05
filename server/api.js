@@ -45,10 +45,11 @@ loadEncryptedEnv(() => {
     cron.schedule('0 22 * * 6', async () => {
         console.log('Running email...');
         if (wantsNotifications) {
-            await sendEmail('t0527698098@gmail.com', 'hi');
+            await sendEmail();
         }
     });
-
+   
+    
 
     app.use('/Notification', verifyToken, notificationsRouter);
     app.use('/Loan', verifyToken, LoanRoute);

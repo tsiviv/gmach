@@ -36,7 +36,7 @@ const verifyToken = (req, res, next) => {
         next();
     });
 };
-const DAILY_LIMIT = 200;
+const DAILY_LIMIT = 4;
 
 // משתנים גלובליים במודול
 

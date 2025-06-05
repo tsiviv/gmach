@@ -57,7 +57,7 @@ export default function Loans() {
             const fromDate2 = fromDate ? new Date(fromDate) : null;
             if (!fromDate2) return true; // אין תאריך לסינון
 
-            if (!(loan.repaymentDay=='null')) {
+            if (!(loan.repaymentDay == 'null')) {
                 const fromDay = fromDate2.getDate();
                 return loan.repaymentDay === fromDay;
             } else {
@@ -173,7 +173,8 @@ export default function Loans() {
                 }
 
                 if (res.borrower.overdue.length > 0) {
-                    issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה (איחור חריג).');
+                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
+                    issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
                 }
 
                 if (res.borrower.late_paid.length > 0) {
@@ -217,6 +218,7 @@ export default function Loans() {
 
     const update = async (LoanToUpdate) => {
         setidUpdate(LoanToUpdate.id)
+        console.log(LoanToUpdate)
         let res
         try {
             res = await GetLoanById(LoanToUpdate.id);
@@ -268,9 +270,8 @@ export default function Loans() {
         const month = (date.getMonth() + 1).toString().padStart(2, '0'); // חודשים מתחילים מ-0
         const year = date.getFullYear();
 
-        const hours = date.getHours().toString().padStart(2, '0');
 
-        return `${day}/${month}/${year} בשעה ${hours}:00`;
+        return `${day}/${month}/${year} `;
     }
 
 
@@ -316,9 +317,10 @@ export default function Loans() {
         })
     }
     return (
-        <div className="container mt-5">
+        <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
-                <Button variant="primary" onClick={() => openShowLoanModal()}>הוסף הלוואה</Button>
+                <Button variant="warning"
+                    className="mb-3 ms-5" onClick={() => openShowLoanModal()}>הוסף הלוואה</Button>
                 <Form className="mb-3">
                     <div className="row align-items-end">
                         <div className="col">
@@ -421,7 +423,7 @@ export default function Loans() {
                 </Form>
             </div>
 
-            <Table striped bordered hover size="sm">
+            <Table striped bordered hover >
                 <thead>
                     <tr>
                         <th></th>
@@ -431,6 +433,7 @@ export default function Loans() {
                         <th>יום החזר</th>
                         <th>סך החזר חודשי </th>
                         <th>סטטוס</th>
+                        <th>תאריך התחלה</th>
                         <th>הערות</th>
                         <th>תעודת זהות</th>
                         <th>שם הלווה</th>
@@ -446,7 +449,7 @@ export default function Loans() {
                             <tr>
                                 <td>
                                     <Button
-                                        variant="success"
+                                        variant="dark"
                                         size="sm"
                                         onClick={() => toggleRow(loanMap.id)}
                                     >
@@ -459,6 +462,7 @@ export default function Loans() {
                                 <td>{loanMap.repaymentDay != "null" ? loanMap.repaymentDay : formatDateToReadable(loanMap.singleRepaymentDate) || "—"}</td>
                                 <td>{loanMap.amountInMonth != "null" ? loanMap.amountInMonth : "—"}</td>
                                 <td>{translateLoanStatus(loanMap.status) || "—"}</td>
+                                <td>{formatDateToReadable(loanMap.startDate) || "—"}</td>
                                 <td>{loanMap.notes || "—"}</td>
                                 <td>{loanMap.borrower?.id || "—"}</td>
                                 <td>{loanMap.borrower?.fullName || "—"}</td>
@@ -466,7 +470,8 @@ export default function Loans() {
                                 <td>{loanMap.borrower?.email || "—"}</td>
                                 <td>
                                     {loanMap.documentPath ? <div>
-                                        <button onClick={() => setShowModal(true)}>צפייה בקובץ</button>
+                                        <Button variant="dark"
+                                            onClick={() => setShowModal(true)}>שטר חוב </Button>
                                         <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${loanMap.documentPath}?token=${token}`} />
                                     </div> : '-'}
                                 </td>
@@ -490,8 +495,8 @@ export default function Loans() {
                                 <tr>
                                     <td colSpan="10" className="bg-light">
                                         <div style={{ padding: "10px" }}>
-                                            <strong>ערבים:</strong>
-                                            {loan.guarantors?.length ? (
+                                            {loan.guarantors?.length>0 && <><strong>ערבים:</strong>
+
                                                 <ul style={{ marginTop: "0.5em" }}>
                                                     {loan.guarantors.map((g, idx) => (
                                                         <li key={idx}>
@@ -499,7 +504,8 @@ export default function Loans() {
                                                             {g.documentPath && (
                                                                 <>
                                                                     <div>
-                                                                        <button onClick={() => setShowModal(true)}>צפייה בקובץ</button>
+                                                                        <Button variant="secondary"
+                                                                            onClick={() => setShowModal(true)}>שטר חוב ערב </Button>
                                                                         <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
                                                                     </div>
                                                                 </>
@@ -507,8 +513,11 @@ export default function Loans() {
                                                         </li>
                                                     ))}
                                                 </ul>
+                                            </>}
+                                            {loan.lateCount === 0 ? (
+                                                <span>אין איחור בתשלום</span>
                                             ) : (
-                                                <div>אין ערבים</div>
+                                                <span>{loan.lateCount} איחורים בתשלום</span>
                                             )}
 
                                             <strong style={{ display: "block", marginTop: "10px" }}>תשלומים:</strong>
@@ -631,8 +640,11 @@ export default function Loans() {
                                 <Form.Control
                                     type="date"
                                     name="singleRepaymentDate"
-                                    value={newLoan.singleRepaymentDate}
-                                    onChange={handleLoanChange}
+                                    value={
+                                        newLoan.singleRepaymentDate
+                                            ? new Date(newLoan.singleRepaymentDate).toISOString().split('T')[0]
+                                            : ''
+                                    } onChange={handleLoanChange}
                                 />
                             </Form.Group>
                         )}
@@ -645,19 +657,17 @@ export default function Loans() {
                                     <div className="d-flex align-items-center justify-content-between">
                                         <span>קובץ קיים</span>
                                         <div>
-                                            <button onClick={() => setShowModal(true)} className="btn btn-link btn-sm">הצג קובץ</button>
-                                            <button
+                                            <Button onClick={() => setShowModal(true)} className="btn btn-secondary btn-sm">הצג קובץ</Button>
+                                            <FaTrash
                                                 type="button"
-                                                className="btn btn-outline-danger btn-sm ms-2"
                                                 onClick={() =>
                                                     setNewLoan((prev) => ({
                                                         ...prev,
                                                         documentPath: null,
                                                     }))
                                                 }
-                                            >
-                                                <i className="bi bi-trash"></i> {/* Bootstrap icon */}
-                                            </button>
+                                            />
+
                                         </div>
                                     </div>
                                     <DocumentModal
@@ -726,17 +736,17 @@ export default function Loans() {
                                 </Form.Group>
 
                                 <Form.Group className="mb-3">
-                                    <Form.Label>מסמך ערב</Form.Label>
+                                    <Form.Label> שטר חוב ערב</Form.Label>
                                     {g.documentPath ? (
                                         <>
                                             <div className="mb-2">
                                                 <div>
                                                     <span>קובץ קיים: </span>
                                                     <div>
-                                                        <button onClick={() => setShowModal(true)}>הצג קובץ</button>
+                                                        <Button class="btn btn-secondary" onClick={() => setShowModal(true)}>הצג קובץ</Button>
                                                         <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
                                                     </div>
-                                                    <button
+                                                    <Button
                                                         type="button"
                                                         className="btn btn-outline-danger btn-sm ms-2"
                                                         onClick={() => {
@@ -750,7 +760,7 @@ export default function Loans() {
                                                         }}
                                                     >
                                                         <i className="bi bi-trash"></i>
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                                 <Form.Label className="mt-2">החלף קובץ:</Form.Label>
                                                 <Form.Control

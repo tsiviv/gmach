@@ -54,11 +54,11 @@ const backupDir = 'E:\\backup';
 const backupPath = path.join(backupDir, 'gmach.sqlite.enc');
 
 if (fs.existsSync(encryptedPath) && flag) {
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
+  if (fs.existsSync(backupDir)) {
+    fs.copyFileSync(encryptedPath, backupPath);
+    console.log(`📁 קובץ גובה אל: ${backupPath}`);
   }
-  fs.copyFileSync(encryptedPath, backupPath);
-  console.log(`📁 קובץ גובה אל: ${backupPath}`);
+
 }
 // התחברות למסד הנתונים המפוענח
 const sequelize = new Sequelize({

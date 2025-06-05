@@ -46,14 +46,11 @@ async function gracefulShutdown() {
         try {
             encryptFile(tempPath, encryptedPath);
             
-            // ⬇️ גיבוי לתיקייה החיצונית
             if (fs.existsSync(encryptedPath)) {
-                // ודא שהתיקייה קיימת
-                if (!fs.existsSync(backupDir)) {
-                    fs.mkdirSync(backupDir, { recursive: true });
-                }
-                fs.copyFileSync(encryptedPath, backupPath);
-                console.log(`📁 קובץ גובה אל: ${backupPath}`);
+              if (fs.existsSync(backupDir)) {
+                   fs.copyFileSync(encryptedPath, backupPath);
+                   console.log(`📁 קובץ גובה אל: ${backupPath}`);
+                 }
             }
 
             deleteTempFile();

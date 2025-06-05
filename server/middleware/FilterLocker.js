@@ -6,7 +6,6 @@ const fs = require('fs');
 function lockFile(filePath) {
   try {
     fs.chmodSync(filePath, 0o000);
-    console.log(`[lockFile] 🔒 קובץ נעול: ${filePath}`);
   } catch (err) {
     console.error(`[lockFile] שגיאה בנעילה: ${err.message}`);
   }
@@ -18,7 +17,6 @@ function lockFile(filePath) {
 function unlockFile(filePath) {
   try {
     fs.chmodSync(filePath, 0o600);
-    console.log(`[unlockFile] 🔓 שוחרר לנגישות קוד: ${filePath}`);
   } catch (err) {
     console.error(`[unlockFile] שגיאה בשחרור: ${err.message}`);
   }
