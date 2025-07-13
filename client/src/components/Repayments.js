@@ -14,6 +14,7 @@ import ModelNewPerson from "./ModelNewPerson";
 import { GetLoanStatusSummary } from '../servieces/Loans'
 import { GetPersonById, GetLoansByPerson } from '../servieces/People'
 import { useNavigate } from 'react-router-dom';
+import { formatAmount ,format} from './helper'
 
 function Repayment() {
     const [repayments, setRepayments] = useState([]);
@@ -63,7 +64,17 @@ function Repayment() {
 
         return true;
     });
+    const handleAmountChange = (e) => {
+        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
+        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
 
+        const numericValue = Number(rawValue);
+        const formattedValue = format(numericValue);
+        setSelectedRepayment((prev) => ({
+            ...prev,
+            amount: formattedValue,
+        }));
+    };
     const fetchRepayments = async () => {
         try {
             const res = await GetAllRepayments();
@@ -114,7 +125,7 @@ function Repayment() {
         if (repayment) {
             setSelectedRepayment({
                 loanId: repayment.loanId,
-                amount: repayment.amount,
+                amount: format(repayment.amount),
                 paidDate: repayment.paidDate,
                 notes: repayment.notes,
                 Guarantor: repayment.Guarantor
@@ -146,9 +157,9 @@ function Repayment() {
     const handleSave = async () => {
         try {
             if (isEdit) {
-                await UpdateRepayment(Id, selectedRepayment.loanId, selectedRepayment.Guarantor, selectedRepayment.amount, selectedRepayment.paidDate, selectedRepayment.notes);
+                await UpdateRepayment(Id, selectedRepayment.loanId, selectedRepayment.Guarantor, selectedRepayment.amount.replace(/,/g, ''), selectedRepayment.paidDate, selectedRepayment.notes);
             } else {
-                await CreateRepayment(selectedRepayment.loanId, selectedRepayment.Guarantor, selectedRepayment.amount, selectedRepayment.paidDate, selectedRepayment.notes);
+                await CreateRepayment(selectedRepayment.loanId, selectedRepayment.Guarantor, selectedRepayment.amount.replace(/,/g, ''), selectedRepayment.paidDate, selectedRepayment.notes);
             }
             await fetchRepayments();
             handleCloseModal();
@@ -294,11 +305,11 @@ function Repayment() {
                             <td>{index + 1}</td>
                             <td>{repayment.loan.borrowerId}</td>
                             <td>{repayment.loan.borrower.fullName} </td>
-                            <td>{repayment.amount} ₪</td>
+                            <td>{formatAmount(repayment.amount,repayment.currency)}</td>
                             <td>{new Date(repayment.paidDate).toLocaleDateString()}</td>
                             <td>{repayment.loan?.amount || '-'}</td>
                             <td>{translaterepaymentType(repayment.loan?.repaymentType) || '-'}</td>
-                            <td>{repayment.loan?.amountInMonth == "null" ? '-' : repayment.loan?.amountInMonth}</td>
+                            <td>{repayment.loan?.amountInMonth == "null" ? '-' : formatAmount(repayment.loan?.amountInMonth,repayment.currency)}</td>
                             <td>{repayment.loan?.startDate ? new Date(repayment.loan.startDate).toLocaleDateString() : '-'}</td>
                             <td>
                                 <FaEdit
@@ -344,12 +355,14 @@ function Repayment() {
                                 {loanguarantors.length > 0 && <option value={true}>ערב</option>}
                             </Form.Select>
                         </Form.Group>
-                        <Form.Group className="mb-3">
+                        <Form.Group className="mb-2">
                             <Form.Label>סכום</Form.Label>
                             <Form.Control
-                                type="number"
+                                type="text"
+                                name="amount"
                                 value={selectedRepayment.amount}
-                                onChange={(e) => setSelectedRepayment({ ...selectedRepayment, amount: e.target.value })}
+                                onChange={handleAmountChange}
+                                required
                             />
                         </Form.Group>
                         <Form.Group className="mb-3">

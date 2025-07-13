@@ -39,7 +39,6 @@ function decryptFile(encryptedPath, outputPath) {
   lockFile(encryptedPath);
 }
 
-// טיפול במקרה שבו הקובץ הזמני קיים ולא נמחק מהריצה הקודמת
 if (fs.existsSync(tempPath)) {
   flag = true
   console.warn('🟡 נמצא קובץ זמני ישן — מצפין אותו מחדש לפני התחלת הריצה');
@@ -47,7 +46,6 @@ if (fs.existsSync(tempPath)) {
   fs.unlinkSync(tempPath);
 }
 
-// פענוח לפני פתיחת המסד
 decryptFile(encryptedPath, tempPath);
 
 const backupDir = 'E:\\backup';
@@ -60,7 +58,6 @@ if (fs.existsSync(encryptedPath) && flag) {
   }
 
 }
-// התחברות למסד הנתונים המפוענח
 const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: tempPath,

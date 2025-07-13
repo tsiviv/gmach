@@ -11,6 +11,7 @@ loadEncryptedEnv(() => {
     const RepaymentRoute = require('./routes/RepaymentRoute');
     const fundMovementRoute = require('./routes/fundMovementRoute');
     const LoginRoute = require('./routes/LoginRoute');
+    const turnsRoute= require('./routes/turnsRoutes')
     const DepositRoute = require('./routes/DepositRoute');
     const notificationsRouter = require('./routes/notifications');
     const { updateLoanStatuses } = require('./controllers/LoanController');
@@ -59,6 +60,7 @@ loadEncryptedEnv(() => {
     app.use('/FundMovement', verifyToken, fundMovementRoute);
     app.use('/Login', LoginRoute);
     app.use('/Deposit', verifyToken, DepositRoute);
+    app.use('/Turn', verifyToken, turnsRoute);
 
     const PORT = 4000;
     app.listen(PORT, () => {

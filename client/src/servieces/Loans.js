@@ -37,10 +37,14 @@ export const CreateLoan = async (
   singleRepaymentDate,
   amountInMonth,
   guarantorsWithFiles = [],
-  loanDocument = null
+  loanDocument = null,
+  typeOfPayment, 
+  currency,
+  amountOfPament
 ) => {
   try {
     const formData = new FormData();
+    formData.append('numOfLoan', numOfLoan);
     formData.append('borrowerId', borrowerId);
     formData.append('amount', amount);
     formData.append('startDate', startDate);
@@ -49,8 +53,10 @@ export const CreateLoan = async (
     formData.append('repaymentDay', repaymentDay);
     formData.append('singleRepaymentDate', singleRepaymentDate);
     formData.append('amountInMonth', amountInMonth);
-    formData.append('numOfLoan', numOfLoan);
-
+    formData.append('amountOfPament', amountOfPament);
+    formData.append('typeOfPayment', typeOfPayment); // חדש
+    formData.append('currency', currency);           // חדש
+    console.log("createloan")
     const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
     formData.append('guarantors', JSON.stringify(guarantorsOnly));
 
@@ -107,10 +113,13 @@ export const UpdateLoan = async (
   singleRepaymentDate,
   amountInMonth,
   guarantorsWithFiles = [],
-  loanDocument = null
+  loanDocument = null,
+  typeOfPayment,
+  currency,amountOfPament
 ) => {
   try {
     const formData = new FormData();
+    formData.append('numOfLoan', numOfLoan);
     formData.append('borrowerId', borrowerId);
     formData.append('amount', amount);
     formData.append('startDate', startDate);
@@ -119,14 +128,16 @@ export const UpdateLoan = async (
     formData.append('repaymentDay', repaymentDay);
     formData.append('singleRepaymentDate', singleRepaymentDate);
     formData.append('amountInMonth', amountInMonth);
-    formData.append('numOfLoan', numOfLoan);
+    formData.append('typeOfPayment', typeOfPayment); // חדש
+    formData.append('currency', currency);           // חדש
+    formData.append('amountOfPament', amountOfPament);
 
     const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
     formData.append('guarantors', JSON.stringify(guarantorsOnly));
-
+    
     if (loanDocument instanceof File) {
       formData.append('loanDocument', loanDocument);
-    } else {
+    } else if (loanDocument) {
       formData.append('documentPath', loanDocument);
     }
 
@@ -143,6 +154,15 @@ export const UpdateLoan = async (
     return res.data;
   } catch (error) {
     console.error('Error updating loan:', error.response?.data || error.message);
+    throw error;
+  }
+};
+export const getMonthlyChecks = async () => {
+  try {
+    const res = await api.get('/Loan/getMonthlyChecks');
+    return res.data;
+  } catch (error) {
+    console.error('שגיאה בעדכון סטטוס התראות:', error);
     throw error;
   }
 };
@@ -187,11 +207,11 @@ export const GetOverdueLoans = async () => {
   }
 };
 export const sendEmail = async () => {
-    try {
-      const res = await api.post('/Loan/send');
-      return res.data;
-    } catch (error) {
-      console.error('Error fetching overdue loans:', error);
-      throw error;
-    }
-  };
+  try {
+    const res = await api.post('/Loan/send');
+    return res.data;
+  } catch (error) {
+    console.error('Error fetching overdue loans:', error);
+    throw error;
+  }
+};

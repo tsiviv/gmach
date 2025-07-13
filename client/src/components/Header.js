@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FaSyncAlt } from 'react-icons/fa';
-import TooltipWrapper from './TooltipWrapper'; // ודא נתיב נכון
+import { FaSyncAlt, FaBell, FaClock } from 'react-icons/fa';
+import TooltipWrapper from './TooltipWrapper'; // ודא שזה הנתיב הנכון
 import '../styles/Header.css';
 import { updateLoanStatusApi } from '../servieces/Loans';
 
@@ -21,7 +21,7 @@ export default function Header() {
 
   const refresh = async () => {
     try {
-      console.log(await updateLoanStatusApi())
+      console.log(await updateLoanStatusApi());
     } catch (e) {
       console.log(e);
     }
@@ -33,16 +33,24 @@ export default function Header() {
       <div className="part2 w-50 d-flex align-items-center gap-5">
 
         <TooltipWrapper text="התראות">
-          <NavLink to="/Notification" style={{ fontSize: '1.3rem', cursor: 'pointer' }}>🔔</NavLink>
+          <NavLink to="/Notification" style={{ fontSize: '1.3rem', cursor: 'pointer' }}>
+            <FaBell />
+          </NavLink>
         </TooltipWrapper>
 
-          <NavLink to="/Explaination">הסבר שימוש</NavLink>
+        <TooltipWrapper text="תזכורות">
+          <NavLink to="/MonthlyChecksNotification" style={{ fontSize: '1.3rem', cursor: 'pointer' }}>
+            <FaClock />
+          </NavLink>
+        </TooltipWrapper>
 
-          {token ? (
-            <button className="btn btn-sm" onClick={logout}>התנתק</button>
-          ) : (
-            <button className="btn btn-sm" onClick={() => navigate('/')}>התחבר</button>
-          )}
+        <NavLink to="/Explaination">הסבר שימוש</NavLink>
+
+        {sessionStorage.getItem('token') ? (
+          <button className="btn btn-sm" onClick={logout}>התנתק</button>
+        ) : (
+          <button className="btn btn-sm" onClick={() => navigate('/')}>התחבר</button>
+        )}
 
         <TooltipWrapper text="עדכון סטטוס הלוואות">
           <FaSyncAlt

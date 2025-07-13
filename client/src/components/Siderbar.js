@@ -8,7 +8,6 @@ export default function Sidebar() {
 
   return (
     <div className="sidebar" dir="rtl">
-      <h5>לוח בקרה</h5>
       <div className="navside flex-column gap-5">
         <div className="nav-item">
           <NavLink to="/people" className={linkClass}>
@@ -33,6 +32,11 @@ export default function Sidebar() {
         <div className="nav-item">
           <NavLink to="/Deposit" className={linkClass}>
             <p className='p-icon'>ניהול פקדונות</p> <FaExchangeAlt /> 
+          </NavLink>
+        </div>
+        <div className="nav-item">
+          <NavLink to="/Turns" className={linkClass}>
+            <p className='p-icon'>ניהול תורים</p> <FaExchangeAlt /> 
           </NavLink>
         </div>
       </div>

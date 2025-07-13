@@ -5,6 +5,7 @@ import {
     createFundMovement,
     updateFundMovement
 } from '../servieces/FundMovement'
+import { FaEdit, FaTrash } from 'react-icons/fa';
 import {
     CreatePerson,
     GetPersonById
@@ -12,6 +13,8 @@ import {
 import '../styles/fund.css'
 import ModelNewPerson from './ModelNewPerson';
 import { useNavigate } from 'react-router-dom';
+import { formatAmount, format } from './helper'
+import { generateDonationReport, generateMovmentReport } from './GenerateReport';
 
 export default function FundMovementsPage({ isAdmin }) {
     const [movements, setMovements] = useState([]);
@@ -25,8 +28,12 @@ export default function FundMovementsPage({ isAdmin }) {
         type: 'manual_adjustment',
         description: '',
         date: '',
-        personId: ''
+        personId: '',
+        typeOfPayment: 'check',
+        currency: 'shekel',
     });
+
+    const [pdfVisible, setPdfVisible] = useState(false);
     const [showMoney, setShowMoney] = useState(false);
     const [showPersonModal, setShowPersonModal] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState('');
@@ -38,13 +45,15 @@ export default function FundMovementsPage({ isAdmin }) {
         if (!selectedFilter) return true;
 
         if (selectedFilter === 'borrowerId') {
-            return movement.person.id.toString().includes(filterValue);
+            return movement.person?.id.toString().includes(filterValue);
         }
 
+        if (selectedFilter === 'name') {
+            return movement.person?.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
 
         if (selectedFilter === 'date') {
-            console.log(fromDate, "F", movement.date)
-            if (!fromDate) return true; // אין תאריך לסינון
+            if (!fromDate) return true;
             return movement.date === fromDate;
         }
 
@@ -57,9 +66,60 @@ export default function FundMovementsPage({ isAdmin }) {
 
         return true;
     });
+    const handleShowPdf = (personId) => {
+        const container = document.getElementById('pdf-container');
+
+        if (pdfVisible) {
+            container.innerHTML = '';
+            setPdfVisible(false);
+        } else {
+            const personMovements = movements.filter(m => m.personId === personId);
+            const url = generateMovmentReport(personMovements);
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.width = '100%';
+            iframe.height = '600px';
+            iframe.style.border = 'none';
+
+            container.innerHTML = '';
+            container.appendChild(iframe);
+            setPdfVisible(true);
+        }
+    };
+
+
     useEffect(() => {
         loadMovements();
     }, []);
+    const countPersonBalance = (personId) => {
+        const personMovements = movements.filter(m => m.personId === personId);
+        let sum = 0;
+
+        personMovements.forEach(element => {
+            const type = (element.type || '').toLowerCase().trim();
+            const amount = Number(element.amount) || 0;
+
+            if (['donation', 'deposit', 'repayment_received'].includes(type)) {
+                sum += amount;
+            } else {
+                sum -= amount;
+            }
+        });
+
+        return sum;
+    };
+
+    const handleAmountChange = (e) => {
+        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
+        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
+
+        const numericValue = Number(rawValue);
+        const formattedValue = format(numericValue);
+        setCurrentMovement((prev) => ({
+            ...prev,
+            amount: formattedValue,
+        }));
+    };
     const countMoneyInKopa = (data) => {
         let sum = 0;
 
@@ -78,13 +138,22 @@ export default function FundMovementsPage({ isAdmin }) {
     }
 
     function translateMovmemntType(MovmemntType) {
+        console.log(MovmemntType)
         const statusMap = {
             repayment_received: 'תשלום על הלוואה',
             loan_given: 'הלוואה',
             deposit: 'הפקדה',
-            pull_deposit: 'משיכה',
+            deposit_pull: 'משיכה',
             donation: 'תרומה',
             manual_adjustment: 'הפקדת מנהל',
+        };
+
+        return statusMap[MovmemntType] || 'לא ידוע';
+    }
+    function translatePaymentType(MovmemntType) {
+        const statusMap = {
+            check: 'צ"ק',
+            Standing_order: 'הוראת קבע',
         };
 
         return statusMap[MovmemntType] || 'לא ידוע';
@@ -112,7 +181,10 @@ export default function FundMovementsPage({ isAdmin }) {
     const handleEditClick = (movement) => {
         setIsEdit(true);
         setid(movement.id);
-        setCurrentMovement({ ...movement });
+        setCurrentMovement({
+            ...movement,
+            amount: format(movement.amount),
+        });
         setShowModal(true);
     };
 
@@ -134,9 +206,21 @@ export default function FundMovementsPage({ isAdmin }) {
         e.preventDefault();
         try {
             if (isEdit) {
-                await updateFundMovement(id, currentMovement.personId, currentMovement.amount, currentMovement.type, currentMovement.description, currentMovement.date);
+                await updateFundMovement(id, currentMovement.personId, currentMovement.amount.replace(/,/g, ''), currentMovement.type, currentMovement.description, currentMovement.date, currentMovement.typeOfPayment,   // חדש
+                    currentMovement.currency);
             } else {
-                await createFundMovement(currentMovement.personId, currentMovement.amount, currentMovement.type, currentMovement.description, currentMovement.date);
+                await createFundMovement(currentMovement.personId, currentMovement.amount.replace(/,/g, ''), currentMovement.type, currentMovement.description, currentMovement.date, currentMovement.typeOfPayment,   // חדש
+                    currentMovement.currency);
+            }
+            if (currentMovement.type == "donation") {
+                let person
+                try {
+                    person = await GetPersonById(currentMovement.personId)
+                }
+                catch (e) {
+
+                }
+                ShowPdf(currentMovement, person)
             }
             handleClose();
         } catch (err) {
@@ -146,6 +230,37 @@ export default function FundMovementsPage({ isAdmin }) {
             console.error('שגיאה בשמירת תנועה:', err);
         }
     };
+    const ShowPdf = (currentMovement, person) => {
+        const container = document.getElementById('pdf-container');
+        if (pdfVisible) {
+            container.innerHTML = '';
+            setPdfVisible(false);
+            return;
+        }
+
+        const url = generateDonationReport(currentMovement, person);
+
+        const closeButton = document.createElement('button');
+        closeButton.textContent = 'סגור דוח';
+        closeButton.className = 'btn btn-danger mb-3'; // Bootstrap classes
+        closeButton.onclick = () => {
+            container.innerHTML = '';
+            setPdfVisible(false);
+        };
+
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.width = '100%';
+        iframe.height = '600px';
+        iframe.style.border = 'none';
+
+        container.innerHTML = '';
+        container.appendChild(closeButton);
+        container.appendChild(iframe);
+
+        setPdfVisible(true);
+    };
+
     const handleIdBlur = async (id) => {
         console.log("on")
         try {
@@ -180,23 +295,26 @@ export default function FundMovementsPage({ isAdmin }) {
                                         setSelectedFilter(e.target.value);
                                         setFilterValue('');
                                         setFromDate('');
+                                        setMinAmount('');
+                                        setMaxAmount('');
                                     }}
                                 >
                                     <option value="">-- אין סינון --</option>
                                     <option value="borrowerId">תעודת זהות</option>
+                                    <option value="name">שם</option> {/* הוספתי כאן */}
                                     <option value="date">תאריך תשלום</option>
-                                    <option value="amount">טווח סכום תשלום  </option>
+                                    <option value="amount">טווח סכום תשלום</option>
                                 </Form.Select>
                             </div>
 
-                            {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
+                            {selectedFilter === 'borrowerId' ? (
                                 <div className="col">
                                     <Form.Label>הזן ערך לסינון:</Form.Label>
                                     <Form.Control
                                         type="text"
                                         value={filterValue}
                                         onChange={(e) => setFilterValue(e.target.value)}
-                                        placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
+                                        placeholder={'לדוגמה: 123456789'}
                                     />
                                 </div>
                             ) : null}
@@ -214,6 +332,17 @@ export default function FundMovementsPage({ isAdmin }) {
                                 </>
                             )
                                 : null}
+                            {selectedFilter === 'name' ? (
+                                <div className="col">
+                                    <Form.Label>הזן ערך לסינון:</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        value={filterValue}
+                                        onChange={(e) => setFilterValue(e.target.value)}
+                                        placeholder={'לדוגמה: ישראל ישראלי'}
+                                    />
+                                </div>
+                            ) : null}
                             {selectedFilter === 'amount' ? (
                                 <>
                                     <div className="col">
@@ -250,38 +379,59 @@ export default function FundMovementsPage({ isAdmin }) {
                             </div>
                         </div>
                     </Form>
-                    {!showMoney ? <Button variant="warning" className="mb-3" onClick={() => { setShowMoney(true) }}>הצג כסף בגמח</Button>
-                        : <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
+                    {!showMoney && filteredmovements.length > 0 &&
+                        filteredmovements.every(m => m.personId === filteredmovements[0].personId) ? (<>
+                            <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'blue' }}>
+                                סך הכל תנועות לאדם: {countPersonBalance(filteredmovements[0].personId).toLocaleString()} ₪
+                            </div>
+                            <Button onClick={() => handleShowPdf(filteredmovements[0].personId)}>
+                                {pdfVisible ? 'סגור דוח' : 'הצג דוח PDF'}
+                            </Button>
+                        </>
+                    ) : !showMoney ? (
+                        <Button variant="warning" className="mb-3" onClick={() => { setShowMoney(true) }}>
+                            הצג כסף בגמח
+                        </Button>
+                    ) : (
+                        <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
                             יש {MoneyInGmach.toLocaleString()} ₪ בגמח
-                        </div>}        </div>
-                <Table striped bordered hover>
-                    <thead>
-                        <tr>
-                            <th>סכום</th>
-                            <th>סוג</th>
-                            <th>תיאור</th>
-                            <th>תאריך</th>
-                            <th>ת"ז</th>
-                            <th>פעולות</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredmovements.map((mov) => (
-                            <tr key={mov.id}>
-                                <td>{mov.amount}</td>
-                                <td>{translateMovmemntType(mov.type)}</td>
-                                <td>{mov.description}</td>
-                                <td>{mov.date}</td>
-                                <td>{mov.personId}</td>
-                                <td>
-                                    {!(mov.type == 'loan_given' || mov.type == 'repayment_received' || mov.type == 'deposit' || mov.type == 'pull_deposit' || mov.type == 'repayment') && <Button size="sm" onClick={() => handleEditClick(mov)}>
-                                        ערוך
-                                    </Button>}
-                                </td>
+                        </div>
+                    )}
+                </div>
+                <div id="pdf-container" className="mt-4"></div>
+                {!pdfVisible &&
+                    <Table striped bordered hover>
+                        <thead>
+                            <tr>
+                                <th>סכום</th>
+                                <th>סוג</th>
+                                <th>תיאור</th>
+                                <th>תאריך</th>
+                                <th>ת"ז</th>
+                                <th>אמצעי תשלום</th>
+                                <th>שם</th>
+                                <th>פעולות</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </Table>
+                        </thead>
+                        <tbody>
+                            {filteredmovements.map((mov) => (
+                                <tr key={mov.id}>
+                                    <td>{formatAmount(mov.amount, mov.currency)}</td>
+                                    <td>{translateMovmemntType(mov.type)}</td>
+                                    <td>{mov.description}</td>
+                                    <td>{mov.date}</td>
+                                    <td>{mov.personId}</td>
+                                    <td>{translatePaymentType(mov.typeOfPayment)}</td>
+                                    <td>{mov.person?.fullName}</td>
+                                    <td>
+                                        {(mov.type == 'donation' || mov.type == 'manual_adjustment') && <Button size="sm" onClick={() => handleEditClick(mov)}>
+                                            ערוך
+                                        </Button>}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </Table>}
 
                 <Modal show={showModal} onHide={handleClose} dir="rtl">
                     <Modal.Header closeButton>
@@ -289,13 +439,13 @@ export default function FundMovementsPage({ isAdmin }) {
                     </Modal.Header>
                     <Modal.Body>
                         <Form onSubmit={submitMovement} className="text-end">
-                            <Form.Group>
+                            <Form.Group className="mb-2">
                                 <Form.Label>סכום</Form.Label>
                                 <Form.Control
-                                    type="number"
+                                    type="text"
                                     name="amount"
                                     value={currentMovement.amount}
-                                    onChange={handleChange}
+                                    onChange={handleAmountChange}
                                     required
                                 />
                             </Form.Group>
@@ -333,6 +483,33 @@ export default function FundMovementsPage({ isAdmin }) {
                                     onChange={handleChange}
                                     required
                                 />
+                            </Form.Group>
+                            <Form.Group>
+                                <Form.Label>אמצעי תשלום</Form.Label>
+                                <Form.Control
+                                    as="select"
+                                    name="typeOfPayment"
+                                    value={currentMovement.typeOfPayment}
+                                    onChange={handleChange}
+                                    required
+                                >
+                                    <option value="check">צ'ק</option>
+                                    <option value="Standing_order">הוראת קבע</option>
+                                </Form.Control>
+                            </Form.Group>
+
+                            <Form.Group>
+                                <Form.Label>מטבע</Form.Label>
+                                <Form.Control
+                                    as="select"
+                                    name="currency"
+                                    value={currentMovement.currency}
+                                    onChange={handleChange}
+                                    required
+                                >
+                                    <option value="shekel">שקל</option>
+                                    <option value="dollar">דולר</option>
+                                </Form.Control>
                             </Form.Group>
 
                             {currentMovement.type !== 'manual_adjustment' && (

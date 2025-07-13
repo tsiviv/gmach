@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('./index');
 
-const FundMovement = sequelize.define('FundMovement', {
+const Turns = sequelize.define('Turns', {
   id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
@@ -11,7 +11,7 @@ const FundMovement = sequelize.define('FundMovement', {
     type: DataTypes.STRING,
     allowNull: true,
     references: {
-      model: 'people', // זה השם של הטבלה של האנשים
+      model: 'people', 
       key: 'id',
     },
     onUpdate: 'CASCADE',
@@ -21,9 +21,10 @@ const FundMovement = sequelize.define('FundMovement', {
     type: DataTypes.FLOAT,
     allowNull: false,
   },
-  type: {
-    type: DataTypes.ENUM('loan_given', 'repayment_received', 'donation', 'manual_adjustment','deposit','pull_deposit'),
+  repaymentType: {
+    type: DataTypes.ENUM('once', 'monthly'),
     allowNull: false,
+    defaultValue: 'once'
   },
   description: {
     type: DataTypes.STRING,
@@ -32,19 +33,9 @@ const FundMovement = sequelize.define('FundMovement', {
     type: DataTypes.DATEONLY,
     defaultValue: DataTypes.NOW,
   },
-  typeOfPayment: {
-        type: DataTypes.ENUM('check', 'Standing_order'),
-        allowNull: false,
-        defaultValue: 'check'
-    },
-  currency: {
-        type: DataTypes.ENUM('dollar', 'shekel'),
-        allowNull: false,
-        defaultValue: 'shekel'
-    },
 }, {
-  tableName: 'fund_movements',
+  tableName: 'turns',
   timestamps: false, // מוסיף createdAt ו-updatedAt אוטומטית
 });
 
-module.exports = FundMovement;
+module.exports = Turns;

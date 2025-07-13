@@ -8,7 +8,7 @@ const Loan = sequelize.define('Loan', {
     primaryKey: true,
     autoIncrement: true,
   },
-  numOfLoan:{
+  numOfLoan: {
     type: DataTypes.STRING,
     allowNull: false,
   },
@@ -33,7 +33,7 @@ const Loan = sequelize.define('Loan', {
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('pending', 'partial', 'paid', 'overdue', 'late_paid','PaidBy_Gauartantor'),
+    type: DataTypes.ENUM('pending', 'partial', 'paid', 'overdue', 'late_paid', 'PaidBy_Gauartantor'),
     allowNull: false,
     defaultValue: 'pending'
   },
@@ -46,7 +46,7 @@ const Loan = sequelize.define('Loan', {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 0,
-  },  
+  },
   repaymentDay: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -57,13 +57,26 @@ const Loan = sequelize.define('Loan', {
   },
   singleRepaymentDate: {
     type: DataTypes.DATE,
-    allowNull: true, 
+    allowNull: true,
+  },
+  amountOfPament: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
   },
   documentPath: {
-  type: DataTypes.STRING,
-  allowNull: true
-}
-
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  typeOfPayment: {
+    type: DataTypes.ENUM('check', 'Standing_order'),
+    allowNull: false,
+    defaultValue: 'once'
+  },
+  currency: {
+    type: DataTypes.ENUM('dollar', 'shekel'),
+    allowNull: false,
+    defaultValue: 'shekel'
+  },
 }, {
   tableName: 'loans',
   timestamps: false,

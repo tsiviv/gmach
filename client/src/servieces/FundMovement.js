@@ -27,14 +27,14 @@ export const getAllMovements = async () => {
   }
 };
 
-export const createFundMovement = async (personId, amount, type, description, date) => {
+export const createFundMovement = async (personId, amount, type, description, date,typeOfPayment,currency) => {
   try {
     const res = await api.post('/FundMovement', {
       personId: personId || null,
       amount,
       type,
       description,
-      date,
+      date,typeOfPayment,currency
     });
     return res.data;
   } catch (error) {
@@ -43,14 +43,14 @@ export const createFundMovement = async (personId, amount, type, description, da
   }
 };
 
-export const updateFundMovement = async (id, personId, amount, type, description, date) => {
+export const updateFundMovement = async (id, personId, amount, type, description, date,typeOfPayment,currency) => {
   try {
     const res = await api.put(`/FundMovement/${id}`, {
       personId: personId || null,
       amount,
       type,
       description,
-      date,
+      date,typeOfPayment,currency
     });
     return res.data;
   } catch (error) {

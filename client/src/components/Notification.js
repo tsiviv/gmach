@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getNotificationsStatus, setNotificationsStatus } from '../servieces/Notification';
-import { GetOverdueLoans } from '../servieces/Loans';
+import { GetOverdueLoans, getMonthlyChecks } from '../servieces/Loans';
 import { useNavigate } from 'react-router-dom';
 import { sendEmail } from '../servieces/Loans';
 
@@ -8,14 +8,18 @@ export const Notification = () => {
     const [enabled, setEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [overdueLoans, setOverdueLoans] = useState([]);
+    const [MonthlyChecks, setMonthlyChecks] = useState([]);
     const navigate = useNavigate();
     useEffect(() => {
         async function fetchData() {
             try {
                 const status = await getNotificationsStatus();
                 const loans = await GetOverdueLoans();
+                const MonthlyChecksRes = await getMonthlyChecks();
+                console.log("MonthlyChecksRes",MonthlyChecksRes)
                 setEnabled(status);
                 setOverdueLoans(loans);
+                setMonthlyChecks(MonthlyChecksRes)
             } catch (err) {
                 if (err.response?.status === 403 || err.response?.status === 401) {
                     navigate('../')
@@ -24,6 +28,7 @@ export const Notification = () => {
             } finally {
                 setLoading(false);
             }
+
         }
 
         fetchData();
@@ -101,9 +106,9 @@ export const Notification = () => {
                             <p>סכום הלוואה: ₪{loan.amount.toLocaleString()}</p>
                             <p>תאריך התחלה: {new Date(loan.startDate).toLocaleDateString()}</p>
                             <p> סוג החזר: {translaterepaymentType(loan.repaymentType)}</p>
-                            {loan.repaymentType=='monthly'?<><p>יום לתשלום בחודש : {loan.repaymentDay}</p>
-                            <p>סכום חודשי: ₪{loan.amountInMonth.toLocaleString()}</p></>:
-                            <p>תאריך החזר: {new Date(loan.singleRepaymentDate).toLocaleDateString()}</p>}
+                            {loan.repaymentType == 'monthly' ? <><p>יום לתשלום בחודש : {loan.repaymentDay}</p>
+                                <p>סכום חודשי: ₪{loan.amountInMonth.toLocaleString()}</p></> :
+                                <p>תאריך החזר: {new Date(loan.singleRepaymentDate).toLocaleDateString()}</p>}
                             <p>מספר איחורים: {loan.lateCount}</p>
                             <p>סטטוס: <strong style={{ color: 'red' }}>{translateLoanStatus(loan.status)}</strong></p>
 

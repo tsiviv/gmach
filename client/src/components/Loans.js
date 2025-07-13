@@ -7,23 +7,29 @@ import DocumentModal from "./DocumentModel";
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from "./ModelNewPerson";
 import { useNavigate } from 'react-router-dom';
+import { formatAmount, format } from './helper'
+import { generateLoanReport } from './GenerateReport';
 
 export default function Loans() {
     const [loans, setLoans] = useState([]);
-    const [loan, setLoan] = useState([]);
+    const [loansMan, setloansMan] = useState([]);
     const [newLoan, setNewLoan] = useState({
-        borrowerId: "",
-        amount: "",
-        startDate: "",
-        notes: "",
-        repaymentType: "monthly",
-        repaymentDay: null,
-        singleRepaymentDate: null,
-        amountInMonth: null,
-        documentPath: null,
         numOfLoan: '',
+        borrowerId: '',
+        amount: '',
+        startDate: '',
+        repaymentType: 'monthly',
+        repaymentDay: '',
+        singleRepaymentDate: '',
+        amountInMonth: '',
+        amountOfPament: '',
+        typeOfPayment: 'check',
+        currency: 'shekel',
+        notes: '',
+        documentPath: null,
         guarantors: []
     });
+    const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL');
     const token = sessionStorage.getItem('token');
     const navigate = useNavigate();
     const [render, setrender] = useState(false)
@@ -39,6 +45,8 @@ export default function Loans() {
     const [fromDate, setFromDate] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
+    const [pdfVisible, setPdfVisible] = useState(false);
+
     const filteredLonas = loans.filter((loan) => {
         if (!selectedFilter) return true;
 
@@ -81,7 +89,43 @@ export default function Loans() {
 
         return true;
     });
+    const handleAmountChange = (e) => {
+        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
+        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
 
+        const numericValue = Number(rawValue);
+        const formattedValue = format(numericValue);
+        setNewLoan((prev) => ({
+            ...prev,
+            amount: formattedValue,
+        }));
+    };
+    const countAmountLeft = (loan) => {
+        console.log("l", loan)
+        let total = loan.amount
+        loan.repayments?.forEach(element => {
+            total -= element.amount
+        });
+        return total
+    }
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'pending':
+                return 'orange';
+            case 'partial':
+                return 'deepskyblue';
+            case 'paid':
+                return 'green';
+            case 'overdue':
+                return 'red';
+            case 'late_paid':
+                return 'tomato';
+            case 'PaidBy_Gauartantor':
+                return 'purple';
+            default:
+                return 'gray';
+        }
+    };
     const handleAddGuarantor = () => {
         const lastGuarantor = newLoan.guarantors?.[newLoan.guarantors.length - 1];
         if (!lastGuarantor || lastGuarantor.PeopleId.trim()) {
@@ -99,7 +143,7 @@ export default function Loans() {
         try {
             const res = await GetLoanById(id);
             console.log(res)
-            setLoan(res);
+            setloansMan(res);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../')
@@ -136,6 +180,32 @@ export default function Loans() {
             const updated = [...newLoan.guarantors];
             updated[index] = { ...updated[index], PeopleId: '' };
             setNewLoan({ ...newLoan, guarantors: updated });
+            const res = await GetLoanStatusSummary(id)
+            console.log(res)
+            const issues = [];
+            if (res.guarantorCount > 0) {
+                issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
+            }
+            if (res.borrower.overdue.length > 0) {
+                setNewLoan({ ...newLoan, ['borrowerId']: '' });
+                issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
+            }
+
+            if (res.borrower.late_paid.length > 0) {
+                issues.push('למשתמש זה יש הלוואה ששולמה באיחור.');
+            }
+
+            if (res.borrower.PaidBy_Gauartantor.length > 0) {
+                issues.push('למשתמש זה יש הלוואות ששולמו ע"י ערב אחר.');
+            }
+
+            if (res.guarantor.overdue.length > 0) {
+                issues.push('המשתמש משמש כערב בהלוואה שפג תוקפה ולא שולמה.');
+            }
+
+            if (issues.length > 0) {
+                alert('אזהרה:\n\n' + issues.join('\n'));
+            }
         }
         try {
             const existingPerson = await GetPersonById(id);
@@ -201,13 +271,37 @@ export default function Loans() {
             console.log(err)
         }
     }
+    const handleShowPdf = (loan) => {
+        const container = document.getElementById('pdf-container');
+
+        if (pdfVisible) {
+            container.innerHTML = '';
+            setPdfVisible(false);
+        } else {
+            const url = generateLoanReport(loan);
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.width = '100%';
+            iframe.height = '600px';
+            iframe.style.border = 'none';
+
+            container.innerHTML = '';
+            container.appendChild(iframe);
+            setPdfVisible(true);
+        }
+    };
+
+
     const handleSubmit = async (e) => {
+        console.log(newLoan)
         e.preventDefault();
-        console.log("check", newLoan.guarantors, newLoan.documentPath)
         try {
-            isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath) :
-                await CreateLoan(newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount, newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath)
+            isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount.replace(/,/g, ''), newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath, newLoan.typeOfPayment,
+                newLoan.currency, newLoan.amountOfPament) :
+                await CreateLoan(newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount.replace(/,/g, ''), newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath, newLoan.typeOfPayment,
+                    newLoan.currency, newLoan.amountOfPament)
             setShowLoanModal(false);
+            navigate('/people', { state: { openPersonId: newLoan.borrowerId } });
             setError('')
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
@@ -231,7 +325,7 @@ export default function Loans() {
             }
         } setNewLoan({
             borrowerId: LoanToUpdate.borrowerId,
-            amount: LoanToUpdate.amount,
+            amount: format(LoanToUpdate.amount),
             startDate: LoanToUpdate.startDate,
             notes: LoanToUpdate.notes,
             repaymentType: LoanToUpdate.repaymentType,
@@ -240,7 +334,10 @@ export default function Loans() {
             amountInMonth: LoanToUpdate.amountInMonth,
             documentPath: LoanToUpdate.documentPath,
             numOfLoan: LoanToUpdate.numOfLoan,
-            guarantors: res.guarantors
+            guarantors: res.guarantors,
+            currency: LoanToUpdate.currency,
+            typeOfPayment: LoanToUpdate.typeOfPayment,
+            amountOfPament: LoanToUpdate.amountOfPament
         })
         setisEdit(true)
         setShowLoanModal(true)
@@ -250,7 +347,6 @@ export default function Loans() {
             const confirmDelete = window.confirm("האם אתה בטוח שברצונך למחוק את ההלוואה ?");
             if (!confirmDelete) return;
 
-            // אם עבר אישור – מחיקה
             const res = await DeleteLoan(id);
             setrender(!render)
             setError('');
@@ -300,18 +396,29 @@ export default function Loans() {
         setShowLoanModal(false)
         setisEdit(false)
     }
+    const translateMethod = (method) => {
+        switch (method) {
+            case 'check': return "צ'ק";
+            case 'Standing_order': return 'הוראת קבע';
+            default: return method;
+        }
+    };
     const openShowLoanModal = () => {
         setShowLoanModal(true)
         setisEdit(false)
         setNewLoan({
-            borrowerId: "",
-            amount: "",
-            startDate: "",
-            notes: "",
-            repaymentType: "monthly",
-            repaymentDay: null,
-            singleRepaymentDate: null,
-            amountInMonth: null,
+            numOfLoan: '',
+            borrowerId: '',
+            amount: '',
+            startDate: '',
+            repaymentType: 'monthly',
+            repaymentDay: '',
+            singleRepaymentDate: '',
+            amountInMonth: '',
+            amountOfPament: '',
+            typeOfPayment: 'check',
+            currency: 'shekel',
+            notes: '',
             documentPath: null,
             guarantors: []
         })
@@ -432,13 +539,13 @@ export default function Loans() {
                         <th>סוג החזר</th>
                         <th>יום החזר</th>
                         <th>סך החזר חודשי </th>
+                        <th>כמות תשלומים</th>
+                        <th>מוחזר ב</th>
                         <th>סטטוס</th>
                         <th>תאריך התחלה</th>
                         <th>הערות</th>
                         <th>תעודת זהות</th>
                         <th>שם הלווה</th>
-                        <th>טלפון</th>
-                        <th>אימייל</th>
                         <th>שטר חוב </th>
                         <th> פעולות</th>
                     </tr>
@@ -457,17 +564,24 @@ export default function Loans() {
                                     </Button>
                                 </td>
                                 <td>{loanMap.numOfLoan}</td>
-                                <td>{loanMap.amount || "—"}</td>
+                                <td>
+                                    {formatAmount(loanMap.amount, loanMap.currency)}
+                                </td>
                                 <td>{translaterepaymentType(loanMap.repaymentType) || "—"}</td>
                                 <td>{loanMap.repaymentDay != "null" ? loanMap.repaymentDay : formatDateToReadable(loanMap.singleRepaymentDate) || "—"}</td>
-                                <td>{loanMap.amountInMonth != "null" ? loanMap.amountInMonth : "—"}</td>
+                                <td>
+                                    {loanMap.amountInMonth
+                                        ? `${loanMap.amountInMonth} ${loanMap.currency === 'shekel' ? '₪' : '$'}`
+                                        : "—"}
+                                </td>
+                                <td>{loanMap.amountOfPament != "null" ? formatAmount(loanMap.amountOfPament, loanMap.currency) : "—"}</td>
+                                <td>{loanMap.typeOfPayment != "null" ? translateMethod(loanMap.typeOfPayment) : "—"}</td>
                                 <td>{translateLoanStatus(loanMap.status) || "—"}</td>
                                 <td>{formatDateToReadable(loanMap.startDate) || "—"}</td>
                                 <td>{loanMap.notes || "—"}</td>
                                 <td>{loanMap.borrower?.id || "—"}</td>
                                 <td>{loanMap.borrower?.fullName || "—"}</td>
-                                <td>{loanMap.borrower?.phone || "—"}</td>
-                                <td>{loanMap.borrower?.email || "—"}</td>
+
                                 <td>
                                     {loanMap.documentPath ? <div>
                                         <Button variant="dark"
@@ -494,45 +608,60 @@ export default function Loans() {
                             {openRowId === loanMap.id && (
                                 <tr>
                                     <td colSpan="10" className="bg-light">
-                                        <div style={{ padding: "10px" }}>
-                                            {loan.guarantors?.length>0 && <><strong>ערבים:</strong>
+                                        <ul className="mt-3">
 
-                                                <ul style={{ marginTop: "0.5em" }}>
-                                                    {loan.guarantors.map((g, idx) => (
-                                                        <li key={idx}>
-                                                            שם ערב: {g.guarantor?.fullName || "לא זמין"}
-                                                            {g.documentPath && (
-                                                                <>
-                                                                    <div>
-                                                                        <Button variant="secondary"
-                                                                            onClick={() => setShowModal(true)}>שטר חוב ערב </Button>
-                                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </>}
-                                            {loan.lateCount === 0 ? (
-                                                <span>אין איחור בתשלום</span>
-                                            ) : (
-                                                <span>{loan.lateCount} איחורים בתשלום</span>
-                                            )}
+                                            <li key={loansMan.id} className="mb-2">
+                                                <strong>הלוואה #{loansMan.id}</strong><br />
+                                                <Button onClick={() => handleShowPdf(loansMan)}>
+                                                    {pdfVisible ? 'סגור דוח' : 'הצג דוח'}
+                                                </Button>
+                                                <div id="pdf-container" className="mt-4"></div>
+                                                💵 סכום התחלתי: {formatAmount(loansMan.amount, loansMan.currency)}<br />
+                                                📉 יתרה: {countAmountLeft(loansMan)}<br />
+                                                📆 סכום לחודש: {formatAmount(loansMan.amountInMonth, loansMan.currency) ?? 'לא זמין'}<br />
+                                                📅 יום בחודש: {loansMan.repaymentDay ?? 'לא צוין'}<br />
+                                                📊 כמות תשלומים: {formatAmount(loansMan.amountOfPament, loansMan.currency) ?? 'לא זמין'}<br />
+                                                <span style={{
+                                                    color: 'white',
+                                                    backgroundColor: getStatusColor(loansMan.status),
+                                                    padding: '3px 8px',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 'bold',
+                                                    display: 'inline-block',
+                                                    marginTop: '4px'
+                                                }}>
+                                                    {translateLoanStatus(loansMan.status)}
+                                                </span>
+                                                <div className="mt-3">
+                                                    <strong style={{ display: "block", marginBottom: "4px" }}>תשלומים:</strong>
+                                                    {loansMan.repayments?.length ? (
+                                                        <Table striped bordered size="sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>סכום</th>
+                                                                    <th>תאריך</th>
+                                                                    <th>אמצעי</th>
+                                                                    <th>הערות</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {loansMan.repayments.map((r, index) => (
+                                                                    <tr key={index}>
+                                                                        <td>{formatAmount(r.amount, r.currency)}</td>
+                                                                        <td>{formatDate(r.paidDate)}</td>
+                                                                        <td>{r.typeOfPayment === 'check' ? 'צק' : 'הוראת קבע'}</td>
+                                                                        <td>{r.notes || '-'}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </Table>
+                                                    ) : (
+                                                        <div>אין תשלומים</div>
+                                                    )}
+                                                </div>
+                                            </li>
 
-                                            <strong style={{ display: "block", marginTop: "10px" }}>תשלומים:</strong>
-                                            {loan.repayments?.length ? (
-                                                <ul>
-                                                    {loan.repayments.map((r, index) => (
-                                                        <li key={index}>
-                                                            {formatDateToReadable(r.paidDate)}: ₪{r.amount}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            ) : (
-                                                <div>אין תשלומים</div>
-                                            )}
-                                        </div>
+                                        </ul>
                                     </td>
                                 </tr>
                             )}
@@ -542,7 +671,6 @@ export default function Loans() {
             </Table>
 
 
-            {/* מודל הלוואה חדשה */}
             <Modal show={showLoanModal} onHide={() => handleclose()} dir="rtl">
                 <Modal.Header closeButton>
                     <Modal.Title>הוסף הלוואה חדשה</Modal.Title>
@@ -550,7 +678,7 @@ export default function Loans() {
                 <Modal.Body>
                     <Form onSubmit={handleSubmit}>
                         <Form.Group className="mb-3">
-                            <Form.Label> מספר הזמנה</Form.Label>
+                            <Form.Label> מספר הלוואה</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="numOfLoan"
@@ -571,13 +699,13 @@ export default function Loans() {
                             />
                         </Form.Group>
 
-                        <Form.Group className="mb-3">
+                        <Form.Group className="mb-2">
                             <Form.Label>סכום</Form.Label>
                             <Form.Control
-                                type="number"
+                                type="text"
                                 name="amount"
                                 value={newLoan.amount}
-                                onChange={handleLoanChange}
+                                onChange={handleAmountChange}
                                 required
                             />
                         </Form.Group>
@@ -701,6 +829,40 @@ export default function Loans() {
                                 />
                             )}
                         </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>כמות תשלומים </Form.Label>
+                            <Form.Control
+                                type="number"
+                                name="amountOfPament"
+                                value={newLoan.amountOfPament || ''}
+                                onChange={handleLoanChange}
+                            />
+                        </Form.Group>
+
+                        <Form.Group className="mb-3">
+                            <Form.Label>אמצעי תשלום</Form.Label>
+                            <Form.Select
+                                name="typeOfPayment"
+                                value={newLoan.typeOfPayment || 'check'}
+                                onChange={handleLoanChange}
+                            >
+                                <option value="check">צ'ק</option>
+                                <option value="Standing_order">הוראת קבע</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        <Form.Group className="mb-3">
+                            <Form.Label>מטבע</Form.Label>
+                            <Form.Select
+                                name="currency"
+                                value={newLoan.currency || 'shekel'}
+                                onChange={handleLoanChange}
+                            >
+                                <option value="shekel">שקל</option>
+                                <option value="dollar">דולר</option>
+                            </Form.Select>
+                        </Form.Group>
+
                         <Form.Group className="mb-3">
                             <Form.Label>הערות</Form.Label>
                             <Form.Control

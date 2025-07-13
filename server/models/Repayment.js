@@ -29,6 +29,16 @@ const Repayment = sequelize.define('Repayment', {
   notes: {
     type: DataTypes.TEXT,
   },
+  typeOfPayment: {
+        type: DataTypes.ENUM('check', 'Standing_order'),
+        allowNull: false,
+        defaultValue: 'once'
+    },
+  currency: {
+        type: DataTypes.ENUM('dollar', 'shekel'),
+        allowNull: false,
+        defaultValue: 'shekel'
+  },
 }, {
   tableName: 'repayments',
   timestamps: false,

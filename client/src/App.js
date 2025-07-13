@@ -8,15 +8,17 @@ import FundMovments from './components/FundMovments';
 import Header from './components/Header';
 import Sidebar from './components/Siderbar';
 import { Explaination } from './components/Explaination';
-import  Deposit  from './components/Deposit';
+import Deposit from './components/Deposit';
 import './App.css'; // אם שמת את הסגנון כאן
 import './styles/colors.css';
 import { Notification } from './components/Notification';
+import Turns from './components/Turns';
+import { MonthlyChecksNotification } from './components/Remainings';
 function App() {
   return (
     <Router>
       <div className="layout" dir="rtl">
-        <Header username="יוסי" onLogout={() => sessionStorage.setItem('token','')} />
+        <Header username="יוסי" onLogout={() => sessionStorage.setItem('token', '')} />
         <div className="layout-body">
           <Sidebar />
           <main className="main">
@@ -29,6 +31,8 @@ function App() {
               <Route path="/Explaination" element={<Explaination />} />
               <Route path="/Deposit" element={<Deposit />} />
               <Route path="/Notification" element={<Notification />} />
+              <Route path="/Turns" element={<Turns />} />
+              <Route path="/MonthlyChecksNotification" element={<MonthlyChecksNotification />} />
             </Routes>
           </main>
         </div>

@@ -1,239 +1,306 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Modal, Form, Table } from 'react-bootstrap';
+import { formatAmount, format } from './helper'
 import {
-    getAllDeposit,
-    createDeposit, getDepositByPersonId
-} from '../servieces/Deposit'; // נניח שקיים service מתאים
+    createDeposit, getDepositsByPersonId,
+    getAllDeposits, deleteDeposit, updateDeposit, getCurrentBalance
+} from '../servieces/Deposit';
 import ModelNewPerson from './ModelNewPerson';
 import { GetPersonById } from '../servieces/People';
 import { useNavigate } from 'react-router-dom';
-
-export default function Deposit() {
-    const [deposits, setDeposits] = useState([]);
+import { generateDepositReport, generatePersonReport } from './GenerateReport';
+export default function Deposite() {
+    const [Deposites, setDeposites] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
-    const [currentDeposit, setCurrentDeposit] = useState({
+    const [currentDeposite, setcurrentDeposite] = useState({
+        id: null,
         PeopleId: '',
-        deposit_amount: '',
-        pull_amount: ''
+        amount: '',
+        repaymentType: 'once',
+        description: '',
+        date: '',
+        method: 'deposit',
+        typeOfPayment: 'check',
+        currency: 'shekel',
     });
     const navigate = useNavigate();
-    const [sachakol, setsachakol] = useState(0)
     const [showAddPersonModal, setShowAddPersonModal] = useState(false);
-    const [error, setError] = useState('')
-    const [selectedFilter, setSelectedFilter] = useState('');
-    const [filterValue, setFilterValue] = useState('');
-    const [minAmount, setMinAmount] = useState('');
-    const [maxAmount, setMaxAmount] = useState('');
-    const filtereddeposits = deposits.filter((deposit) => {
-        if (!selectedFilter) return true;
-    
-        if (selectedFilter === 'borrowerId') {
-            return deposit.PeopleId.toString().includes(filterValue);
-        }
-    
-        if (selectedFilter === 'pull_amount') {
-            const amount = Number(deposit.pull_amount);
-            const min = Number(minAmount) || 0;
-            const max = Number(maxAmount) || Infinity;
-            return amount >= min && amount <= max;
-        }
-        if (selectedFilter === 'deposit_amount') {
-            const amount = Number(deposit.deposit_amount);
-            const min = Number(minAmount) || 0;
-            const max = Number(maxAmount) || Infinity;
-            return amount >= min && amount <= max;
-        }
-        return true;
-    });
+    const [error, setError] = useState('');
+    const [searchName, setSearchName] = useState('');
+    const [searchId, setSearchId] = useState('');
+    const [searchMethod, setSearchMethod] = useState('');
+
     useEffect(() => {
-        loadDeposits();
+        loadDeposites();
     }, []);
-    const SachDeposit = (data) => {
-        let sum = 0
-        data.forEach((dep) => {
-            sum += dep.deposit_amount
-            sum -= dep.pull_amount
-        })
-        console.log(sum)
-        setsachakol(sum)
-    }
-    const loadDeposits = async () => {
+
+    const loadDeposites = async () => {
         try {
-            const data = await getAllDeposit();
+            const data = await getAllDeposits();
+            setDeposites(data);
             console.log(data)
-            setDeposits(data);
-            SachDeposit(data)
-        }
-        catch(err){
+        } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
-                navigate('../')
+                navigate('../');
             }
         }
-
-        
     };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setCurrentDeposit((prev) => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        setcurrentDeposite((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
     };
+
     const handleIdBlur = async () => {
-        console.log("on")
         try {
-            const existingPerson = await GetPersonById(currentDeposit.PeopleId);
-            console.log(existingPerson)
+            const existingPerson = await GetPersonById(currentDeposite.PeopleId);
             if (!existingPerson) {
                 setShowAddPersonModal(true);
-                setCurrentDeposit({ ...currentDeposit, ['PeopleId']: '' });
+                setcurrentDeposite({ ...currentDeposite, ['PeopleId']: '' });
             }
-            else {
-                const dep = await getDepositByPersonId(currentDeposit.PeopleId)
-                console.log(dep)
-                setCurrentDeposit({
-                    ...currentDeposit,
-                    deposit_amount: dep.deposit_amount,
-                    pull_amount: dep.pull_amount
-                });
-            }
-        }
-        catch (err) {
+        } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
-                navigate('../')
+                navigate('../');
             }
-            console.log(err)
         }
-    }
+    };
+
     const handleAdd = () => {
-        setCurrentDeposit({
+        setcurrentDeposite({
+            id: null,
             PeopleId: '',
-            deposit_amount: '',
-            pull_amount: ''
+            amount: '',
+            repaymentType: 'once',
+            description: '',
+            date: '',
+            method: 'deposit',
+            typeOfPayment: 'check',
+            currency: 'shekel',
         });
         setIsEdit(false);
         setShowModal(true);
     };
 
-    const handleEdit = (deposit) => {
-        setCurrentDeposit({ ...deposit });
+    const handleEdit = (turn) => {
+        setcurrentDeposite({
+            id: turn.id,
+            PeopleId: turn.PeopleId,
+            amount: format(turn.amount),
+            repaymentType: turn.repaymentType,
+            description: turn.description,
+            date: turn.date ? turn.date.split('T')[0] : '',
+            isDeposit: turn.isDeposit !== undefined ? turn.isDeposit : true,
+            method: turn.method || 'check',
+            typeOfPayment: turn.typeOfPayment || 'check',
+            currency: turn.currency || 'shekel',
+        });
         setIsEdit(true);
         setShowModal(true);
     };
 
+    const handleDelete = async (id) => {
+        if (window.confirm('אתה בטוח שברצונך למחוק את התנועה הזו?')) {
+            try {
+                await deleteDeposit(id);
+                loadDeposites();
+            } catch (err) {
+                alert('שגיאה במחיקת תנועה');
+            }
+        }
+    };
+
     const handleClose = () => {
         setShowModal(false);
-        loadDeposits();
+        loadDeposites();
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (currentDeposit.pull_amount > currentDeposit.deposit_amount) {
-            setError('סבום המשיכה גבוה מסכום ההפקדה')
-            return
+        e.preventDefault(currentDeposite);
+        console.log()
+        if (!currentDeposite.PeopleId) {
+            setError('יש להזין תעודת זהות');
+            return;
         }
-        await createDeposit(currentDeposit.PeopleId, currentDeposit.pull_amount, currentDeposit.deposit_amount);
-
-        handleClose();
+        if (!currentDeposite.amount) {
+            setError('יש להזין סכום');
+            return;
+        }
+        let balancePreson = 0;
+        try {
+            const res = await getCurrentBalance(currentDeposite.PeopleId);
+            balancePreson = res.balance;
+        } catch (e) {
+            console.log(e);
+        }
+        if (currentDeposite.method === "deposit_pull" && balancePreson - currentDeposite.amount < 0) {
+            setError('אין יתרה מספיקה למשיכה');
+            return;
+        }
+        try {
+            if (isEdit) {
+                await updateDeposit(currentDeposite.id, currentDeposite);
+            } else {
+                await createDeposit({
+                    PeopleId: currentDeposite.PeopleId,
+                    amount: currentDeposite.amount.replace(/,/g, ''),
+                    date: currentDeposite.date,
+                    typeOfPayment: currentDeposite.typeOfPayment,
+                    description: currentDeposite.description,
+                    currency: currentDeposite.currency,
+                    method: currentDeposite.method,
+                    isDeposit: currentDeposite.method === "deposit"
+                });
+            }
+            let alldepsoit = []
+            try {
+                alldepsoit = await getDepositsByPersonId(currentDeposite.PeopleId);
+            } catch (e) {
+                console.log(e);
+            }
+            if (currentDeposite.method === "deposit")
+                handleShowPdf(currentDeposite, balancePreson, alldepsoit)
+            handleClose();
+        } catch (err) {
+            setError(err?.response?.data?.error || 'שגיאה בלתי צפויה');
+        }
     };
 
+    const translateMethod = (method) => {
+        switch (method) {
+            case 'check': return "צ'ק";
+            case 'Standing_order': return 'הוראת קבע';
+            default: return method;
+        }
+    };
+   const handleShowPdf = (deposite, balancePreson, history) => {
+    const url = generateDepositReport(deposite, balancePreson, history);
+
+    const container = document.getElementById('pdf-container-2');
+    container.innerHTML = ''; // ריקון לפני יצירה
+
+    // יצירת iframe
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.width = '100%';
+    iframe.height = '600px';
+    iframe.style.border = 'none';
+
+    // יצירת כפתור סגירה
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = '✖ סגור';
+    closeBtn.style.margin = '10px 0';
+    closeBtn.style.padding = '5px 10px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.backgroundColor = '#f44336';
+    closeBtn.style.color = 'white';
+    closeBtn.style.border = 'none';
+    closeBtn.style.borderRadius = '4px';
+    closeBtn.onclick = () => {
+        container.innerHTML = ''; // הסרה
+    };
+
+    container.appendChild(closeBtn);
+    container.appendChild(iframe);
+};
+
+    const handleAmountChange = (e) => {
+        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
+        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
+
+        const numericValue = Number(rawValue);
+        const formattedValue = format(numericValue);
+        setcurrentDeposite((prev) => ({
+            ...prev,
+            amount: formattedValue,
+        }));
+    };
+
+    const filteredDeposits = Deposites.filter(dep => {
+        const nameMatch = dep.person.fullName.includes(searchName);
+        const idMatch = dep.PeopleId.toString().includes(searchId);
+        const methodMatch = searchMethod ? (searchMethod === 'deposit' ? dep.isDeposit : !dep.isDeposit) : true;
+        return nameMatch && idMatch && methodMatch;
+    });
+
     return (
-        <div className="container pt-5">
-            <div className='header-fund'>
-                <Button variant="warning" className="mb-3 ms-5" onClick={handleAdd}>
-                    הוסף הפקדה
-                </Button>
-                <Form className="mb-3">
-                    <div className="row align-items-end">
-                        <div className="col">
-                            <Form.Label>בחר שדה לסינון:</Form.Label>
-                            <Form.Select
-                                value={selectedFilter}
-                                onChange={(e) => {
-                                    setSelectedFilter(e.target.value);
-                                    setFilterValue('');
-                                    setMinAmount('')
-                                    setMaxAmount('')
-                                }}
-                            >
-                                <option value="">-- אין סינון --</option>
-                                <option value="borrowerId">תעודת זהות</option>
-                                <option value="deposit_amount">טווח סכום הפקדה  </option>
-                                <option value="pull_amount">טווח סכום משיכה  </option>
-                            </Form.Select>
-                        </div>
-
-                        {selectedFilter === 'borrowerId' || selectedFilter === 'name' ? (
-                            <div className="col">
-                                <Form.Label>הזן ערך לסינון:</Form.Label>
-                                <Form.Control
-                                    type="text"
-                                    value={filterValue}
-                                    onChange={(e) => setFilterValue(e.target.value)}
-                                    placeholder={selectedFilter === 'borrowerId' ? 'לדוגמה: 123456789' : 'לדוגמה: ישראל ישראלי'}
-                                />
-                            </div>
-                        ) : null}
-
-                        {selectedFilter === 'deposit_amount'||selectedFilter === 'pull_amount' ? (
-                            <>
-                                <div className="col">
-                                    <Form.Label>מסכום:</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={minAmount}
-                                        onChange={(e) => setMinAmount(e.target.value)}
-                                    />
-                                </div>
-                                <div className="col">
-                                    <Form.Label>עד סכום:</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        value={maxAmount}
-                                        onChange={(e) => setMaxAmount(e.target.value)}
-                                    />
-                                </div>
-                            </>
-                        )
-                            : null}
-
-                        <div className="col-auto">
-                            <Button
-                                variant="outline-secondary"
-                                onClick={() => {
-                                    setSelectedFilter('');
-                                    setFilterValue('');
-                                }}
-                            >
-                                נקה סינון
-                            </Button>
-                        </div>
+        <div className="container pt-5" dir="rtl">
+            <div className="header-turns mb-3 d-flex justify-content-between align-items-center">
+                <Button variant="warning" onClick={handleAdd}>הוסף תנועה</Button>
+            </div>
+            <Form className="mb-3">
+                <div className="row align-items-end">
+                    <div className="col">
+                        <Form.Label>בחר שדה לסינון:</Form.Label>
+                        <Form.Select
+                            value={searchMethod}
+                            onChange={(e) => setSearchMethod(e.target.value)}
+                        >
+                            <option value="">-- כל הסוגים --</option>
+                            <option value="deposit">הפקדה</option>
+                            <option value="pull">משיכה</option>
+                        </Form.Select>
                     </div>
-                </Form>
-                <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
-                    יש סכום של  {sachakol} ₪ מהפקדות
-                </div>            </div>
+
+                    <div className="col">
+                        <Form.Label>חיפוש לפי שם:</Form.Label>
+                        <Form.Control
+                            type="text"
+                            value={searchName}
+                            onChange={(e) => setSearchName(e.target.value)}
+                            placeholder="לדוגמה: ישראל ישראלי"
+                        />
+                    </div>
+
+                    <div className="col">
+                        <Form.Label>חיפוש לפי ת.ז:</Form.Label>
+                        <Form.Control
+                            type="text"
+                            value={searchId}
+                            onChange={(e) => setSearchId(e.target.value)}
+                            placeholder="לדוגמה: 123456789"
+                        />
+                    </div>
+
+                    <div className="col-auto">
+                        <Button
+                            variant="outline-secondary"
+                            onClick={() => {
+                                setSearchName('');
+                                setSearchId('');
+                                setSearchMethod('');
+                            }}
+                        >
+                            נקה סינון
+                        </Button>
+                    </div>
+                </div>
+            </Form>
+            <div id="pdf-container-2" className="mt-4"></div>
 
             <Table striped bordered hover>
                 <thead>
                     <tr>
-                        <th>ת"ז</th>
-                        <th>שם</th>
-                        <th>סכום הפקדה</th>
-                        <th>סכום משיכה</th>
-                        <th>פעולות</th>
+                        <th>ת"ז</th><th>שם</th><th>סכום</th><th>שיטת תשלום</th><th>סוג פעולה</th><th>יתרת הפקדה</th><th>תיאור</th><th>תאריך</th><th>פעולות</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {filtereddeposits.map((d) => (
-                        <tr key={d.id}>
-                            <td>{d.PeopleId}</td>
-                            <td>{d.person.fullName}</td>
-                            <td>{d.deposit_amount}</td>
-                            <td>{d.pull_amount}</td>
+                    {filteredDeposits.map((Deposite) => (
+                        <tr key={Deposite.id}>
+                            <td>{Deposite.PeopleId}</td>
+                            <td>{Deposite.person.fullName}</td>
+                            <td>{formatAmount(Deposite.amount, Deposite.currency)}</td>
+                            <td>{translateMethod(Deposite.typeOfPayment)}</td>
+                            <td>{Deposite.isDeposit ? 'הפקדה' : 'משיכה'}</td>
+                            <td>{formatAmount(Deposite.balanceAfter, Deposite.currency)}</td>
+                            <td>{Deposite.description}</td>
+                            <td>{Deposite.date ? Deposite.date.split('T')[0] : ''}</td>
                             <td>
-                                <Button size="sm" onClick={() => handleEdit(d)}>
-                                    ערוך
-                                </Button>
+                                <Button variant="primary" size="sm" className="me-2" onClick={() => handleEdit(Deposite)}>ערוך</Button>
+                                <Button variant="danger" size="sm" onClick={() => handleDelete(Deposite.id)}>מחק</Button>
                             </td>
                         </tr>
                     ))}
@@ -242,50 +309,102 @@ export default function Deposit() {
 
             <Modal show={showModal} onHide={handleClose} dir="rtl">
                 <Modal.Header closeButton>
-                    <Modal.Title>{isEdit ? 'עריכת הפקדה' : 'הוספת הפקדה'}</Modal.Title>
+                    <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handleSubmit} className="text-end">
-                        <Form.Group>
+                        <Form.Group className="mb-2">
                             <Form.Label>תעודת זהות</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="PeopleId"
-                                value={currentDeposit.PeopleId}
+                                value={currentDeposite.PeopleId}
                                 onChange={handleChange}
-                                onBlur={() => handleIdBlur()}
+                                onBlur={handleIdBlur}
                                 required
                             />
                         </Form.Group>
-                        {console.log(currentDeposit)
-                        }                        <Form.Group>
-                            <Form.Label>סכום הפקדה</Form.Label>
+
+                        <Form.Group className="mb-2">
+                            <Form.Label>סכום</Form.Label>
                             <Form.Control
-                                type="number"
-                                name="deposit_amount"
-                                value={currentDeposit.deposit_amount}
+                                type="text"
+                                name="amount"
+                                value={currentDeposite.amount}
+                                onChange={handleAmountChange}
+                                required
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-2">
+                            <Form.Label>שיטת תשלום</Form.Label>
+                            <Form.Select
+                                name="typeOfPayment"
+                                value={currentDeposite.typeOfPayment}
                                 onChange={handleChange}
-                                onBlur={() => setError('')}
+                                required
+                            >
+                                <option value="check">צ'ק</option>
+                                <option value="Standing_order">הוראת קבע</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        <Form.Group className="mb-2">
+                            <Form.Label>סוג פעולה</Form.Label>
+                            <Form.Select
+                                name="isDeposit"
+                                value={currentDeposite.method}
+                                onChange={(e) =>
+                                    setcurrentDeposite((prev) => ({
+                                        ...prev,
+                                        method: e.target.value,
+                                    }))
+                                }
+                            >
+                                <option value="deposit">הפקדה</option>
+                                <option value="deposit_pull">משיכה</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        <Form.Group className="mb-2">
+                            <Form.Label>תיאור</Form.Label>
+                            <Form.Control
+                                type="text"
+                                name="description"
+                                value={currentDeposite.description}
+                                onChange={handleChange}
                             />
                         </Form.Group>
 
-                        <Form.Group>
-                            <Form.Label>סכום משיכה</Form.Label>
+                        <Form.Group className="mb-2">
+                            <Form.Label>תאריך</Form.Label>
                             <Form.Control
-                                type="number"
-                                name="pull_amount"
-                                value={currentDeposit.pull_amount}
+                                type="date"
+                                name="date"
+                                value={currentDeposite.date}
                                 onChange={handleChange}
-                                onBlur={() => setError('')}
+                                required
                             />
                         </Form.Group>
-                        {error && <p className='error'>{error}</p>}
-                        <Button type="submit" className="mt-3">
-                            {isEdit ? 'עדכן' : 'הוסף'}
-                        </Button>
+
+                        <Form.Group className="mb-2">
+                            <Form.Label>מטבע</Form.Label>
+                            <Form.Select
+                                name="currency"
+                                value={currentDeposite.currency}
+                                onChange={handleChange}
+                                required
+                            >
+                                <option value="shekel">שקל</option>
+                                <option value="dollar">דולר</option>
+                            </Form.Select>
+                        </Form.Group>
+
+                        {error && <p className="error text-danger">{error}</p>}
+                        <Button type="submit" className="mt-3">{isEdit ? 'עדכן' : 'הוסף'}</Button>
                     </Form>
                 </Modal.Body>
             </Modal>
+
             <ModelNewPerson showModal={showAddPersonModal} setShowModal={setShowAddPersonModal} />
         </div>
     );

@@ -10,6 +10,8 @@ const fs = require('fs');
 const FundMovement = require('../models/FundMovement');
 const moment = require('moment');
 const { sendEmail } = require('../controllers/emailer')
+const Turn = require('../models/Turns')
+const Deposit = require('../models/Deposit')
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const tmpPath = 'uploads/tmp';
@@ -84,7 +86,7 @@ const controller = {
             }
 
             try {
-                const { borrowerId, amount, startDate, notes, repaymentType, repaymentDay, singleRepaymentDate, amountInMonth, numOfLoan } = req.body;
+                const { borrowerId, amount, startDate, notes, repaymentType, repaymentDay, singleRepaymentDate, amountInMonth, numOfLoan, typeOfPayment, currency, amountOfPament } = req.body;
                 const guarantors = JSON.parse(req.body.guarantors || '[]');
 
                 const newLoan = await Loan.create({
@@ -95,8 +97,9 @@ const controller = {
                     startDate,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate, amountInMonth, numOfLoan
+                    singleRepaymentDate, amountInMonth, numOfLoan, typeOfPayment, currency, amountOfPament
                 });
+                await Turn.destroy({ where: { id: newLoan.id } });
 
                 const loanFile = req.files.find(f => f.fieldname === 'loanDocument');
                 if (loanFile) {
@@ -129,7 +132,7 @@ const controller = {
                         documentPath: finalDocumentPath
                     });
                 }
-                await createFundMovement(borrowerId, amount, 'loan_given', notes, startDate);
+                await createFundMovement(borrowerId, amount, 'loan_given', typeOfPayment, currency, notes, startDate);
 
                 res.status(201).json({ loan: newLoan, message: 'Loan and guarantors created successfully' });
 
@@ -158,7 +161,7 @@ const controller = {
                     notes,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate, amountInMonth, numOfLoan
+                    singleRepaymentDate, amountInMonth, numOfLoan, typeOfPayment, currency, amountOfPament
                 } = req.body;
 
                 const guarantors = JSON.parse(req.body.guarantors || '[]');
@@ -194,7 +197,7 @@ const controller = {
                     notes,
                     repaymentType,
                     repaymentDay,
-                    singleRepaymentDate, amountInMonth, numOfLoan
+                    singleRepaymentDate, amountInMonth, numOfLoan, typeOfPayment, currency, amountOfPament
                 });
 
                 // מסמך הלוואה חדש
@@ -248,7 +251,6 @@ const controller = {
                     });
                 }
 
-                // ✅ כל העדכון הצליח – עכשיו מוחקים את הקבצים הישנים
                 for (const oldPath of oldPathsToDelete) {
                     try {
                         fs.unlinkSync(oldPath);
@@ -317,8 +319,133 @@ const controller = {
             res.status(500).json({ error: err.message });
         }
     },
+    getMonthlyChecks: async (req, res) => {
+        try {
+            const today = new Date();
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
 
-    // הלוואות שלא שולמו במלואן
+            const startOfMonth = new Date(currentYear, currentMonth, 1);
+            const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+
+            const results = [];
+
+            // === חלק 1: הלוואות ===
+            const loans = await Loan.findAll({
+                where: {
+                    typeOfPayment: 'check',
+                    status: { [Op.not]: 'paid' },
+                    [Op.or]: [
+                        {
+                            repaymentType: 'once',
+                            singleRepaymentDate: { [Op.between]: [startOfMonth, endOfMonth] },
+                        },
+                        {
+                            repaymentType: 'monthly',
+                            repaymentDay: { [Op.ne]: null },
+                        },
+                    ],
+                },
+                include: [
+                    {
+                        model: People,
+                        as: 'borrower',
+                        attributes: ['id', 'fullName'],
+                    },
+                ],
+            });
+
+            for (const loan of loans) {
+                let repaymentDate;
+
+                if (loan.repaymentType === 'monthly') {
+                    repaymentDate = new Date(currentYear, currentMonth, loan.repaymentDay || 1);
+                } else if (loan.repaymentType === 'once') {
+                    repaymentDate = new Date(loan.singleRepaymentDate);
+                }
+
+                const isDue =
+                    repaymentDate.getMonth() === currentMonth &&
+                    repaymentDate.getFullYear() === currentYear;
+
+                if (isDue) {
+                    results.push({
+                        source: 'loan',
+                        loanId: loan.id,
+                        amount: loan.amountOfPament,
+                        repaymentDate: repaymentDate.toISOString().split('T')[0],
+                        personId: loan.borrower?.id,
+                        fullName: loan.borrower?.fullName,
+                    });
+                }
+            }
+
+            const deposits = await Deposit.findAll({
+                where: {
+                    typeOfPayment: 'check',
+                    date: { [Op.between]: [startOfMonth, endOfMonth] },
+                },
+                include: [
+                    {
+                        model: People,
+                        as: 'person',
+                        attributes: ['id', 'fullName'],
+                    },
+                ],
+            });
+
+            for (const dep of deposits) {
+                results.push({
+                    source: 'deposit',
+                    depositId: dep.id,
+                    amount: dep.amount,
+                    repaymentDate: dep.date,
+                    personId: dep.PeopleId,
+                    fullName: dep.person?.fullName,
+                });
+            }
+
+            // === חלק 3: תרומות עם צ'ק ===
+            const donations = await FundMovement.findAll({
+                where: {
+                    type: {
+                        [Op.in]: ['donation', 'manual_adjustment'],
+                    },
+                    typeOfPayment: 'check',
+                    date: {
+                        [Op.between]: [startOfMonth, endOfMonth],
+                    },
+                },
+                include: [
+                    {
+                        model: People,
+                        as: 'person',
+                        attributes: ['id', 'fullName'],
+                    },
+                ],
+            });
+
+            console.log(donations)
+            for (const don of donations) {
+                results.push({
+                    source: 'donation',
+                    donationId: don.id,
+                    amount: don.amount,
+                    repaymentDate: don.date,
+                    type:don.type,
+                    personId: don.personId,
+                    fullName: don.person?.fullName,
+                });
+            }
+
+            results.sort((a, b) => new Date(a.repaymentDate) - new Date(b.repaymentDate));
+
+            return res.json({ checksThisMonth: results });
+        } catch (error) {
+            console.error('Error in getMonthlyChecks:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    },
     GetUnpaidLoans: async (req, res) => {
         try {
             const loans = await Loan.findAll({
@@ -408,12 +535,12 @@ const controller = {
 
             borrowerLoans.forEach(loan => {
                 const status = loan.status;
-                if (status === 'pending' ) {
+                if (status === 'pending') {
                     borrowerLoansByStatus.pendingOrPartial.push(loan);
-                } 
-                else if(status === 'partial'){
+                }
+                else if (status === 'partial') {
                     borrowerLoansByStatus['overdue'].push(loan);
-                }else if (borrowerLoansByStatus[status]) {
+                } else if (borrowerLoansByStatus[status]) {
                     borrowerLoansByStatus[status].push(loan);
                 }
             });
@@ -436,7 +563,7 @@ const controller = {
                 const loan = link.Loan;
                 if (!loan) return;
 
-                if (loan.status === 'overdue'||loan.status === 'partial') {
+                if (loan.status === 'overdue' || loan.status === 'partial') {
                     guarantorLoansByStatus.overdue.push(loan);
                 } else if (loan.status === 'late_paid') {
                     guarantorLoansByStatus.late_paid.push(loan);
@@ -445,7 +572,8 @@ const controller = {
 
             res.json({
                 borrower: borrowerLoansByStatus,
-                guarantor: guarantorLoansByStatus
+                guarantor: guarantorLoansByStatus,
+                guarantorCount: guarantorLinks.length  // ← כאן הכמות הכוללת שהוא ערב
             });
         } catch (err) {
             console.error(err);
@@ -480,6 +608,9 @@ const controller = {
         const today = moment();
 
         for (const loan of loans) {
+            if (loan.borrowerId === '89') {
+                console.log("loan 589 type:", loan.repaymentType, "trimmed:", loan.repaymentType?.trim());
+            }
             const repayments = await Repayment.findAll({
                 where: { loanId: loan.id }
             });
@@ -519,23 +650,21 @@ const controller = {
                 const expectedAmount = monthsDue * loan.amountInMonth;
                 const unpaidAmount = expectedAmount - totalPaid;
 
-                // עדכון כמות איחורים רק אם השתנתה
                 const shouldUpdateLateCount = lateMonths !== loan.lateCount;
                 if (shouldUpdateLateCount) {
                     loan.lateCount = lateMonths;
                 }
-
                 let newStatus;
                 if (lateMonths > 0 && totalPaid === 0) {
                     newStatus = 'overdue';
-                } else if (totalPaid > 0 && totalPaid < expectedAmount) {
+                } else if (totalPaid > 0 && totalPaid < expectedAmount && lateMonths > 0) {
                     newStatus = 'partial';
+                }
+                else if (totalPaid == expectedAmount && loan.amount > totalPaid) {
+                    newStatus = 'pending';
                 }
                 else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths > 0) {
                     newStatus = 'late_paid';
-                }
-                else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths == 0 && loan.amount > totalPaid) {
-                    newStatus = 'pending';
                 }
                 else if (totalPaid == expectedAmount && loan.status !== 'PaidBy_Gauartantor' && lateMonths == 0 && loan.amount == totalPaid) {
                     newStatus = 'paid';
@@ -550,8 +679,10 @@ const controller = {
                     await loan.save();
                 }
 
-            } else if (loan.repaymentType === 'once') {
+            } else {
+                console.log("DSF\gdhg", loan)
                 const isOverdue = today.isAfter(loan.singleRepaymentDate);
+                console.log("DSF\gdhg", isOverdue, today.loan.singleRepaymentDate)
                 if (isOverdue && totalPaid === 0) {
                     newStatus = 'overdue';
                 } else if (totalPaid > 0 && totalPaid < loan.amount && isOverdue) {
@@ -578,7 +709,7 @@ const controller = {
         }
     }
 
-
+    ,
 
 
 }

@@ -37,7 +37,8 @@ module.exports = {
                             as: 'borrower'
                         }],
                     }
-                ]            });
+                ]
+            });
             res.json(repayments);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -47,21 +48,25 @@ module.exports = {
     CreateRepayment: async (req, res) => {
         try {
             const { loanId, Guarantor, amount, paidDate, notes } = req.body;
-            const repayment = await Repayment.create({ loanId, Guarantor, amount, paidDate, notes });
             await updateLoanStatus(loanId, Guarantor);
             const loan = await Loan.findByPk(loanId);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
             }
+            const repayment = await Repayment.create({ loanId, Guarantor, amount, paidDate, notes, typeOfPayment:loan.typeOfPayment, currency:loan.currency});
+            console.log(loan.typeOfPayment)
             await createFundMovement(
                 loan.borrowerId,
                 amount,
                 'repayment_received',
+                loan.currency,
+                loan.typeOfPayment,
                 `Repayment for loan #${loanId}`,
                 paidDate,
             );
             res.status(201).json(repayment);
         } catch (err) {
+            console.log(err)
             res.status(500).json({ error: err.message });
         }
     },
@@ -69,7 +74,7 @@ module.exports = {
     UpdateRepayment: async (req, res) => {
         try {
             const { id } = req.params;
-            const { loanId, Guarantor, amount, paidDate, notes } = req.body;
+            const { loanId, Guarantor, amount, paidDate, notes, typeOfPayment, currency } = req.body;
             const repayment = await Repayment.findByPk(id);
             if (!repayment) return res.status(404).json({ error: 'Repayment not found' });
             const loan = await Loan.findByPk(loanId);
@@ -82,12 +87,11 @@ module.exports = {
             });
 
             if (existingMovement) {
-                await existingMovement.update({ amount });
-                console.log('עודכנה תנועת קרן קיימת');
+                await existingMovement.update({ amount, typeOfPayment, currency });
             } else {
                 console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
             }
-            await repayment.update({ loanId, Guarantor, amount, paidDate, notes });
+            await repayment.update({ loanId, Guarantor, amount, paidDate, notes, typeOfPayment, currency });
             await updateLoanStatus(loanId, Guarantor);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
