@@ -1,17 +1,49 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FaSyncAlt, FaBell, FaClock } from 'react-icons/fa';
-import TooltipWrapper from './TooltipWrapper'; // ודא שזה הנתיב הנכון
+import { FaSyncAlt, FaBell, FaClock, FaEdit } from 'react-icons/fa';
+import TooltipWrapper from './TooltipWrapper';
 import '../styles/Header.css';
 import { updateLoanStatusApi } from '../servieces/Loans';
+import { title as defaultTitle } from './config';
+import { updateSiteTitle, uploadLogo, getSiteDetails } from '../servieces/Login'
 
 export default function Header() {
   const navigate = useNavigate();
   const [token, settoken] = useState();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [hoverLogo, setHoverLogo] = useState(false);
+  const [hoverTitle, setHoverTitle] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const [siteTitle, setSiteTitle] = useState(localStorage.getItem('siteTitle') || "hi");
+  const [logoUrl, setLogoUrl] = useState();
+useEffect(() => {
+  const tokenFromStorage = sessionStorage.getItem('token');
+  settoken(tokenFromStorage);
+}, []);
 
   useEffect(() => {
-    settoken(sessionStorage.getItem('token'));
-  }, []);
+  if (!token) return;
+
+  const fetchDetails = async () => {
+    try {
+      const data = await getSiteDetails();
+      if (data.name) {
+        setSiteTitle(data.name);
+        localStorage.setItem('siteTitle', data.name);
+      }
+      if (data.logo) {
+        // תוסיף timestamp כדי לעקוף cache
+        setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}&t=${Date.now()}`);
+      }
+    } catch (error) {
+      console.error('שגיאה בקבלת פרטי האתר:', error);
+    }
+  };
+
+  fetchDetails();
+}, [token]); // יפעל רק כשהtoken נטען
+
 
   const logout = () => {
     sessionStorage.removeItem('token');
@@ -27,9 +59,98 @@ export default function Header() {
     }
   };
 
+  const handleLogoClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      await uploadLogo(file, siteTitle);
+      const data = await getSiteDetails();
+      setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}&t=${Date.now()}`);
+      localStorage.setItem('logoUrl', data.logo);
+    } catch (error) {
+      console.error('שגיאה בהעלאת לוגו:', error);
+    }
+  };
+
+  const saveTitle = async () => {
+    setEditingTitle(false);
+    try {
+      await updateSiteTitle(siteTitle);
+      localStorage.setItem('siteTitle', siteTitle);
+    } catch (e) {
+      console.error('שגיאה בעדכון השם:', e);
+    }
+  };
+
+
   return (
     <header className="header p-4 d-flex align-items-center" dir="rtl">
-      <div className="name fw-bold fs-2 w-50">גמ"ח חסד יחיאל</div>
+      <div className="name fw-bold fs-2 w-50 d-flex align-items-center gap-2">
+
+        <div
+          onMouseEnter={() => setHoverLogo(true)}
+          onMouseLeave={() => setHoverLogo(false)}
+          style={{ position: 'relative', cursor: 'pointer', marginLeft: "30px" }}
+          onClick={handleLogoClick}
+        >
+          <img
+            src={logoUrl}
+            alt="logo"
+            style={{ height: '70px', width: '70px', objectFit: 'contain' }}
+          />
+          {hoverLogo && (
+            <FaEdit
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                color: '#007bff',
+                background: '#fff',
+                borderRadius: '50%',
+                fontSize: '0.8rem',
+              }}
+            />
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleFileChange}
+          />
+        </div>
+
+        <div
+          onMouseEnter={() => setHoverTitle(true)}
+          onMouseLeave={() => setHoverTitle(false)}
+          style={{ position: 'relative' }}
+        >
+          {editingTitle ? (
+            <input
+              type="text"
+              value={siteTitle}
+              onChange={(e) => setSiteTitle(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
+              autoFocus
+              className="form-control form-control-sm"
+            />
+          ) : (
+            <span onClick={() => setEditingTitle(true)} style={{ cursor: 'pointer' }}>
+              {siteTitle}
+              {hoverTitle && (
+                <FaEdit style={{ marginRight: 5, fontSize: '0.8rem', color: '#007bff' }} />
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="part2 w-50 d-flex align-items-center gap-5">
 
         <TooltipWrapper text="התראות">
@@ -46,7 +167,7 @@ export default function Header() {
 
         <NavLink to="/Explaination">הסבר שימוש</NavLink>
 
-        {sessionStorage.getItem('token') ? (
+        {token ? (
           <button className="btn btn-sm" onClick={logout}>התנתק</button>
         ) : (
           <button className="btn btn-sm" onClick={() => navigate('/')}>התחבר</button>

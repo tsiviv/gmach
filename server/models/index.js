@@ -58,6 +58,9 @@ if (fs.existsSync(encryptedPath) && flag) {
   }
 
 }
+
+
+
 const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: tempPath,

@@ -56,8 +56,8 @@ module.exports = {
       res.status(500).json({ error: err.message });
     }
   },
-  createFundMovement: async function (personId, amount, type, currency, typeOfPayment,description = '', date = new Date()) {
-    console.log("create", personId, amount, type,typeOfPayment)
+  createFundMovement: async function (personId, amount, type, currency, typeOfPayment, description = '', date = new Date()) {
+    console.log("create", personId, amount, type, typeOfPayment)
     if (!personId || !amount || !type) {
       console.log(personId, amount, type, description)
       throw new Error('Missing required fields');
@@ -72,7 +72,36 @@ module.exports = {
     });
 
     return movement;
-  }
+  },
 
+  updateMovementByOldAndNewData: async function (oldData, newData) {
+    console.log(oldData)
+    const whereConditions = {
+      personId: oldData.PeopleId,
+      amount: oldData.amount,
+      type: oldData.method,
+      date: oldData.date,
+      currency: oldData.currency
+    };
+
+    const movement = await FundMovement.findOne({
+      where: whereConditions,
+    });
+
+    if (!movement) {
+      throw new Error('תנועה לא נמצאה עם הנתונים שסופקו');
+    }
+
+    await movement.update({
+      personId: newData.PeopleId,
+      amount: newData.amount,
+      type: newData.method,
+      description: newData.description,
+      date: newData.date,
+      currency: newData.currency,
+    });
+
+    return movement;
+  }
 
 };

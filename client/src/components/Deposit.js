@@ -142,6 +142,7 @@ export default function Deposite() {
         }
         try {
             if (isEdit) {
+                currentDeposite.amount = currentDeposite.amount.replace(/,/g, '')
                 await updateDeposit(currentDeposite.id, currentDeposite);
             } else {
                 await createDeposit({
@@ -156,13 +157,19 @@ export default function Deposite() {
                 });
             }
             let alldepsoit = []
-            try {
-                alldepsoit = await getDepositsByPersonId(currentDeposite.PeopleId);
-            } catch (e) {
-                console.log(e);
+            let person
+            if (currentDeposite.method === "deposit") {
+                try {
+                    alldepsoit = await getDepositsByPersonId(currentDeposite.PeopleId);
+                    person = await GetPersonById(currentDeposite.PeopleId);
+                    const res = await getCurrentBalance(currentDeposite.PeopleId);
+                    balancePreson = res.balance;
+                    currentDeposite.amount=Number(currentDeposite.amount.replace(/,/g, '').trim());
+                } catch (e) {
+                    console.log(e);
+                }
+                handleShowPdf(currentDeposite, person, balancePreson, alldepsoit)
             }
-            if (currentDeposite.method === "deposit")
-                handleShowPdf(currentDeposite, balancePreson, alldepsoit)
             handleClose();
         } catch (err) {
             setError(err?.response?.data?.error || 'שגיאה בלתי צפויה');
@@ -173,39 +180,40 @@ export default function Deposite() {
         switch (method) {
             case 'check': return "צ'ק";
             case 'Standing_order': return 'הוראת קבע';
+            case 'cash': return 'מזומן';
             default: return method;
         }
     };
-   const handleShowPdf = (deposite, balancePreson, history) => {
-    const url = generateDepositReport(deposite, balancePreson, history);
+    const handleShowPdf = async (deposite, person, balancePreson, history) => {
+        const url = await generateDepositReport(deposite, person, balancePreson, history);
 
-    const container = document.getElementById('pdf-container-2');
-    container.innerHTML = ''; // ריקון לפני יצירה
+        const container = document.getElementById('pdf-container-2');
+        container.innerHTML = ''; // ריקון לפני יצירה
 
-    // יצירת iframe
-    const iframe = document.createElement('iframe');
-    iframe.src = url;
-    iframe.width = '100%';
-    iframe.height = '600px';
-    iframe.style.border = 'none';
+        // יצירת iframe
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.width = '100%';
+        iframe.height = '600px';
+        iframe.style.border = 'none';
 
-    // יצירת כפתור סגירה
-    const closeBtn = document.createElement('button');
-    closeBtn.innerText = '✖ סגור';
-    closeBtn.style.margin = '10px 0';
-    closeBtn.style.padding = '5px 10px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.style.backgroundColor = '#f44336';
-    closeBtn.style.color = 'white';
-    closeBtn.style.border = 'none';
-    closeBtn.style.borderRadius = '4px';
-    closeBtn.onclick = () => {
-        container.innerHTML = ''; // הסרה
+        // יצירת כפתור סגירה
+        const closeBtn = document.createElement('button');
+        closeBtn.innerText = '✖ סגור';
+        closeBtn.style.margin = '10px 0';
+        closeBtn.style.padding = '5px 10px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.backgroundColor = '#f44336';
+        closeBtn.style.color = 'white';
+        closeBtn.style.border = 'none';
+        closeBtn.style.borderRadius = '4px';
+        closeBtn.onclick = () => {
+            container.innerHTML = ''; // הסרה
+        };
+
+        container.appendChild(closeBtn);
+        container.appendChild(iframe);
     };
-
-    container.appendChild(closeBtn);
-    container.appendChild(iframe);
-};
 
     const handleAmountChange = (e) => {
         const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
@@ -312,9 +320,9 @@ export default function Deposite() {
                     <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Form onSubmit={handleSubmit} className="text-end">
-                        <Form.Group className="mb-2">
-                            <Form.Label>תעודת זהות</Form.Label>
+                    <Form onSubmit={handleSubmit} className="text-end" dir="rtl">
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">תעודת זהות</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="PeopleId"
@@ -322,34 +330,39 @@ export default function Deposite() {
                                 onChange={handleChange}
                                 onBlur={handleIdBlur}
                                 required
+                                style={{ textAlign: 'right' }}
                             />
                         </Form.Group>
 
-                        <Form.Group className="mb-2">
-                            <Form.Label>סכום</Form.Label>
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">סכום</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="amount"
                                 value={currentDeposite.amount}
                                 onChange={handleAmountChange}
                                 required
+                                style={{ textAlign: 'right' }}
                             />
                         </Form.Group>
-                        <Form.Group className="mb-2">
-                            <Form.Label>שיטת תשלום</Form.Label>
+
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">שיטת תשלום</Form.Label>
                             <Form.Select
                                 name="typeOfPayment"
                                 value={currentDeposite.typeOfPayment}
                                 onChange={handleChange}
                                 required
+                                style={{ textAlign: 'right' }}
                             >
+                                <option value="chash">מזומן</option>
                                 <option value="check">צ'ק</option>
                                 <option value="Standing_order">הוראת קבע</option>
                             </Form.Select>
                         </Form.Group>
 
-                        <Form.Group className="mb-2">
-                            <Form.Label>סוג פעולה</Form.Label>
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">סוג פעולה</Form.Label>
                             <Form.Select
                                 name="isDeposit"
                                 value={currentDeposite.method}
@@ -359,51 +372,59 @@ export default function Deposite() {
                                         method: e.target.value,
                                     }))
                                 }
+                                style={{ textAlign: 'right' }}
                             >
                                 <option value="deposit">הפקדה</option>
                                 <option value="deposit_pull">משיכה</option>
                             </Form.Select>
                         </Form.Group>
 
-                        <Form.Group className="mb-2">
-                            <Form.Label>תיאור</Form.Label>
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">תיאור</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="description"
                                 value={currentDeposite.description}
                                 onChange={handleChange}
+                                style={{ textAlign: 'right' }}
                             />
                         </Form.Group>
 
-                        <Form.Group className="mb-2">
-                            <Form.Label>תאריך</Form.Label>
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">תאריך</Form.Label>
                             <Form.Control
                                 type="date"
                                 name="date"
                                 value={currentDeposite.date}
                                 onChange={handleChange}
                                 required
+                                style={{ textAlign: 'right' }}
                             />
                         </Form.Group>
 
-                        <Form.Group className="mb-2">
-                            <Form.Label>מטבע</Form.Label>
+                        <Form.Group className="mb-2 text-end">
+                            <Form.Label className="float-end">מטבע</Form.Label>
                             <Form.Select
                                 name="currency"
                                 value={currentDeposite.currency}
                                 onChange={handleChange}
                                 required
+                                style={{ textAlign: 'right' }}
                             >
                                 <option value="shekel">שקל</option>
                                 <option value="dollar">דולר</option>
                             </Form.Select>
                         </Form.Group>
 
-                        {error && <p className="error text-danger">{error}</p>}
-                        <Button type="submit" className="mt-3">{isEdit ? 'עדכן' : 'הוסף'}</Button>
+                        {error && <p className="error text-danger text-end">{error}</p>}
+
+                        <div className="text-end mt-3">
+                            <Button type="submit">{isEdit ? 'עדכן' : 'הוסף'}</Button>
+                        </div>
                     </Form>
                 </Modal.Body>
             </Modal>
+
 
             <ModelNewPerson showModal={showAddPersonModal} setShowModal={setShowAddPersonModal} />
         </div>

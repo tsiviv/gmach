@@ -11,19 +11,22 @@ import { getDepositsByPersonId } from '../servieces/Deposit';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { formatAmount } from './helper'
 import { generatePersonReport } from './GenerateReport';
+import DocumentModal from "./DocumentModel";
+
 const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL');
 
 function People() {
     const navigate = useNavigate();
     const location = useLocation();
     const [people, setPeople] = useState([]);
-    const [showModal, setShowModal] = useState(false);
+    const [showPersonModal, setShowPersonModal] = useState(false);
+    const [showDocumentModal, setShowDocumentModal] = useState(false);
+    const [openLoanId, setOpenLoanId] = useState(false);
     const [openRowId, setOpenRowId] = useState(null);
     const [render, setrender] = useState(false);
     const [loans, setloans] = useState([]);
     const [isEdit, setisEdit] = useState(false);
     const [deposit, setdeposit] = useState('');
-    const [showDetails, setShowDetails] = useState({});
     const rowRefs = useRef({});
     const [newPerson, setNewPerson] = useState({ full_name: '', phone: '', address: '', email: '', notes: '', id: '' });
     const [selectedFilter, setSelectedFilter] = useState('');
@@ -32,6 +35,7 @@ function People() {
     const [showRepayments, setShowRepayments] = useState({});
     const [dep, setdep] = useState()
     const [pdfVisible, setPdfVisible] = useState(false);
+    const token = sessionStorage.getItem('token');
 
     const filteredpeople = people.filter((person) => {
         if (!selectedFilter) return true;
@@ -80,7 +84,7 @@ function People() {
             }
         };
         fetch();
-    }, [showModal, render]);
+    }, [showPersonModal, render]);
 
     const countAmountLeft = (loan) => {
         let total = loan.amount
@@ -115,6 +119,7 @@ function People() {
             setdep(res2)
             setdeposit(calculateDepositStats(res2));
             setloans(res);
+            setOpenLoanId(openLoanId === res[0].id ? null : res[0].id)
             console.log("res", res2)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) navigate('../');
@@ -126,7 +131,7 @@ function People() {
 
     const update = (p) => {
         setNewPerson({ full_name: p.fullName, phone: p.phone, address: p.address, email: p.email, notes: p.notes, id: p.id });
-        setShowModal(true);
+        setShowPersonModal(true);
         setisEdit(true);
     };
 
@@ -169,14 +174,14 @@ function People() {
         console.log(stats)
         return stats;
     }
-    const handleShowPdf = (person, loans, deposits) => {
+    const handleShowPdf = async (person, loans, deposits) => {
         const container = document.getElementById('pdf-container');
 
         if (pdfVisible) {
             container.innerHTML = '';
             setPdfVisible(false);
         } else {
-            const url = generatePersonReport(person, loans, deposits);
+            const url = await generatePersonReport(person, loans, deposits);
             const iframe = document.createElement('iframe');
             iframe.src = url;
             iframe.width = '100%';
@@ -191,7 +196,7 @@ function People() {
     return (
         <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
-                <Button variant="warning" className="mb-3 ms-5 p-4" onClick={() => setShowModal(true)}>הוסף איש</Button>
+                <Button variant="warning" className="mb-3 ms-5 p-4" onClick={() => setShowPersonModal(true)}>הוסף איש</Button>
                 <Form className="mb-3">
                     <div className="row align-items-end">
                         <div className="col">
@@ -253,7 +258,7 @@ function People() {
                             {openRowId === p.id && (
                                 <tr>
                                     <td colSpan="8" className="bg-light">
-                                        <strong>סכום כולל הלוואות: ₪{getTotalLoanAmount()}</strong>
+                                        {/* <strong>סכום כולל הלוואות: ₪{getTotalLoanAmount()}</strong> */}
                                         <Button onClick={() => handleShowPdf(p, loans, dep)}>
                                             {pdfVisible ? 'סגור דוח' : 'הצג דוח'}
                                         </Button>
@@ -262,12 +267,19 @@ function People() {
                                             {loans.map((loan) => (
 
                                                 <li key={loan.id} className="mb-2">
+
                                                     <strong>הלוואה #{loan.id}</strong><br />
+
                                                     💵 סכום התחלתי: {formatAmount(loan.amount, loan.currency)}<br />
                                                     📉 יתרה: {formatAmount(countAmountLeft(loan), loan.currency)}<br />
                                                     📆 סכום לחודש: {formatAmount(loan.amountInMonth, loan.currency) ?? 'לא זמין'}<br />
                                                     📅 יום בחודש: {loan.repaymentDay ?? 'לא צוין'}<br />
                                                     📊 כמות תשלומים: {loan.amountOfPament ?? 'לא זמין'}<br />
+                                                    {loan.documentPath ? <div>
+                                                        <Button variant="dark"
+                                                            onClick={() => setShowDocumentModal(true)}>שטר חוב </Button>
+                                                        <DocumentModal show={showDocumentModal} onClose={() => setShowDocumentModal(false)} pdfUrl={`http://localhost:4000/${loan.documentPath}?token=${token}`} />
+                                                    </div> : '-'}
                                                     <span style={{
                                                         color: 'white',
                                                         backgroundColor: getStatusColor(loan.status),
@@ -279,24 +291,50 @@ function People() {
                                                     }}>
                                                         {translateLoanStatus(loan.status)}
                                                     </span>
+                                                    <br></br>
+
+
+                                                    {openLoanId === loan.id && loan.guarantors && loan.guarantors.length > 0 && (
+                                                        <ul style={{ marginTop: "0.5em" }}>
+                                                            {loan.guarantors.map((g, idx) => (
+                                                                <li key={idx}>
+                                                                    שם ערב: {g.guarantor?.fullName || "לא זמין"}
+                                                                    {g.documentPath && (
+                                                                        <>
+                                                                            {" - "}
+                                                                            <DocumentModal show={showDocumentModal} onClose={() => setShowDocumentModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
+                                                                            <Button className="btn btn-dark" onClick={() => setShowDocumentModal(true)}> שטר חוב ערב</Button>
+                                                                        </>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+
+                                                    )}
                                                     <div className="mt-2">
-                                                        <Button
-                                                            variant="outline-success"
-                                                            size="sm"
-                                                            className="me-2"
-                                                            onClick={() => setShowDeposits(prev => ({ ...prev, [loan.id]: !prev[loan.id] }))}
-                                                        >
-                                                            {showDeposits[loan.id] ? 'הסתר הפקדות' : 'הצג הפקדות'}
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline-primary"
-                                                            size="sm"
-                                                            onClick={() => setShowRepayments(prev => ({ ...prev, [loan.id]: !prev[loan.id] }))}
-                                                        >
-                                                            {showRepayments[loan.id] ? 'הסתר תשלומים' : 'הצג תשלומים'}
-                                                        </Button>
+                                                        {deposit.length > 0 && (
+                                                            <Button
+                                                                variant="outline-success"
+                                                                size="sm"
+                                                                className="me-2"
+                                                                onClick={() => setShowDeposits(prev => ({ ...prev, [loan.id]: !prev[loan.id] }))}
+                                                            >
+                                                                {showDeposits[loan.id] ? 'הסתר הפקדות' : 'הצג הפקדות'}
+                                                            </Button>
+                                                        )}
+
+                                                        {loan.repayments.length > 0 && (
+                                                            <Button
+                                                                variant="outline-primary"
+                                                                size="sm"
+                                                                onClick={() => setShowRepayments(prev => ({ ...prev, [loan.id]: !prev[loan.id] }))}
+                                                            >
+                                                                {showRepayments[loan.id] ? 'הסתר תשלומים' : 'הצג תשלומים'}
+                                                            </Button>
+                                                        )}
+
                                                     </div>
-                                                    {showDeposits[loan.id] && deposit && (
+                                                    {showDeposits[loan.id] && deposit.length>0 && (
                                                         <div className="mt-2">
                                                             <p>
                                                                 יתרת הפקדות: {formatAmount(deposit.balance, deposit.cureency)}<br></br>
@@ -305,7 +343,7 @@ function People() {
                                                             </p>
                                                         </div>
                                                     )}
-                                                    {showRepayments[loan.id] && loan.repayments && (
+                                                    {showRepayments[loan.id] && loan.repayments.length && (
                                                         <div className="mt-2">
                                                             <Table striped bordered size="sm">
                                                                 <thead>
@@ -341,7 +379,7 @@ function People() {
             </Table>
 
 
-            <ModelNewPerson showModal={showModal} updatePerson={newPerson} setShowModal={setShowModal} isEdit={isEdit} setisEdit={setisEdit} />
+            <ModelNewPerson showModal={showPersonModal} updatePerson={newPerson} setShowModal={setShowPersonModal} isEdit={isEdit} setisEdit={setisEdit} />
         </div>
     );
 }

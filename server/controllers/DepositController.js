@@ -1,8 +1,8 @@
 const Deposit = require('../models/Deposit');
 const People = require('../models/People');
-const { createFundMovement } = require('./fundMovementController');
+const { createFundMovement, updateMovementByOldAndNewData } = require('./fundMovementController');
 const { Op } = require('sequelize');
-const FundMovement=require('../models/FundMovement')
+const FundMovement = require('../models/FundMovement')
 module.exports = {
 
     createDeposit: async (req, res) => {
@@ -40,7 +40,7 @@ module.exports = {
                 date,
             });
 
-            await createFundMovement(PeopleId, amount, method, description || '', date);
+            await createFundMovement(PeopleId, amount, method, currency, typeOfPayment, description || '', date);
             res.status(201).json(deposit);
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -75,12 +75,17 @@ module.exports = {
             } = req.body;
 
             const deposit = await Deposit.findByPk(id);
-
+            try {
+                await updateMovementByOldAndNewData(deposit, req.body)
+            }
+            catch (e) {
+                console.log(e)
+                return res.status(404).json({ e: e });
+            }
             if (!deposit) {
                 return res.status(404).json({ error: 'הפקדה לא נמצאה' });
             }
 
-            // נשלוף את ההפקדה האחרונה לפני ההפקדה הזו (כדי לחשב יתרה מחדש)
             const previousDeposit = await Deposit.findOne({
                 where: {
                     PeopleId,
@@ -97,8 +102,8 @@ module.exports = {
 
             const previousBalance = Number(previousDeposit?.balanceAfter) || 0;
             const amountNum = Number(amount);
-
-            let newBalance;
+            console.log(previousBalance, amount)
+            let newBalance = 0;
             if (isDeposit) {
                 newBalance = previousBalance + amountNum;
             } else {
@@ -107,7 +112,7 @@ module.exports = {
                 }
                 newBalance = previousBalance - amountNum;
             }
-
+            console.log(newBalance)
             // עדכון ההפקדה
             await deposit.update({
                 PeopleId,
@@ -187,7 +192,6 @@ module.exports = {
                     personId: PeopleId,
                     amount: depositToDelete.amount,
                     type: depositToDelete.method,
-                    description: depositToDelete.description || '',
                     date
                 }
             }); const previousDeposit = await Deposit.findOne({

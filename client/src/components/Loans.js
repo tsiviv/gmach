@@ -46,7 +46,7 @@ export default function Loans() {
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
     const [pdfVisible, setPdfVisible] = useState(false);
-
+    const [openLoanId, setOpenLoanId] = useState(true);
     const filteredLonas = loans.filter((loan) => {
         if (!selectedFilter) return true;
 
@@ -142,8 +142,9 @@ export default function Loans() {
     const toggleRow = async (id) => {
         try {
             const res = await GetLoanById(id);
-            console.log(res)
+            console.log("reasds", res)
             setloansMan(res);
+            setOpenLoanId(openLoanId === id ? null : id)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../')
@@ -180,41 +181,42 @@ export default function Loans() {
             const updated = [...newLoan.guarantors];
             updated[index] = { ...updated[index], PeopleId: '' };
             setNewLoan({ ...newLoan, guarantors: updated });
-            const res = await GetLoanStatusSummary(id)
-            console.log(res)
-            const issues = [];
-            if (res.guarantorCount > 0) {
-                issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
-            }
-            if (res.borrower.overdue.length > 0) {
-                setNewLoan({ ...newLoan, ['borrowerId']: '' });
-                issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
-            }
-
-            if (res.borrower.late_paid.length > 0) {
-                issues.push('למשתמש זה יש הלוואה ששולמה באיחור.');
-            }
-
-            if (res.borrower.PaidBy_Gauartantor.length > 0) {
-                issues.push('למשתמש זה יש הלוואות ששולמו ע"י ערב אחר.');
-            }
-
-            if (res.guarantor.overdue.length > 0) {
-                issues.push('המשתמש משמש כערב בהלוואה שפג תוקפה ולא שולמה.');
-            }
-
-            if (issues.length > 0) {
-                alert('אזהרה:\n\n' + issues.join('\n'));
-            }
         }
+
         try {
             const existingPerson = await GetPersonById(id);
-            console.log(existingPerson)
             if (!existingPerson) {
                 setShowAddPersonModal(true);
                 const updated = [...newLoan.guarantors];
                 updated[index] = { ...updated[index], PeopleId: '' };
                 setNewLoan({ ...newLoan, guarantors: updated });
+            }
+            else {
+                const res = await GetLoanStatusSummary(id)
+                console.log(res)
+                const issues = [];
+                if (res.guarantorCount > 0) {
+                    issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
+                }
+                if (res.borrower.overdue.length > 0) {
+                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
+                    issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
+                }
+
+                if (res.borrower.late_paid.length > 0) {
+                    issues.push('למשתמש זה יש הלוואה ששולמה באיחור.');
+                }
+
+                if (res.borrower.PaidBy_Gauartantor.length > 0) {
+                    issues.push('למשתמש זה יש הלוואות ששולמו ע"י ערב אחר.');
+                }
+
+                if (res.guarantor.overdue.length > 0) {
+                    issues.push('המשתמש משמש כערב בהלוואה שפג תוקפה ולא שולמה.');
+                }
+                if (issues.length > 0) {
+                    alert('אזהרה:\n\n' + issues.join('\n'));
+                }
             }
         }
         catch (err) {
@@ -255,6 +257,10 @@ export default function Loans() {
                     issues.push('למשתמש זה יש הלוואות ששולמו ע"י ערב אחר.');
                 }
 
+                if (res.guarantorCount > 0) {
+                    issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
+                }
+
                 if (res.guarantor.overdue.length > 0) {
                     issues.push('המשתמש משמש כערב בהלוואה שפג תוקפה ולא שולמה.');
                 }
@@ -271,14 +277,14 @@ export default function Loans() {
             console.log(err)
         }
     }
-    const handleShowPdf = (loan) => {
+    const handleShowPdf = async (loan) => {
         const container = document.getElementById('pdf-container');
 
         if (pdfVisible) {
             container.innerHTML = '';
             setPdfVisible(false);
         } else {
-            const url = generateLoanReport(loan);
+            const url = await generateLoanReport(loan);
             const iframe = document.createElement('iframe');
             iframe.src = url;
             iframe.width = '100%';
@@ -293,7 +299,7 @@ export default function Loans() {
 
 
     const handleSubmit = async (e) => {
-        console.log(newLoan)
+        console.log("newLoan", newLoan)
         e.preventDefault();
         try {
             isEdit ? await UpdateLoan(IdUpdate, newLoan.numOfLoan, newLoan.borrowerId, newLoan.amount.replace(/,/g, ''), newLoan.startDate, newLoan.notes, newLoan.repaymentType, newLoan.repaymentType == 'monthly' ? newLoan.repaymentDay : null, newLoan.repaymentType == 'monthly' ? null : newLoan.singleRepaymentDate, newLoan.repaymentType == 'monthly' ? newLoan.amountInMonth : null, newLoan.guarantors, newLoan.documentPath, newLoan.typeOfPayment,
@@ -400,6 +406,7 @@ export default function Loans() {
         switch (method) {
             case 'check': return "צ'ק";
             case 'Standing_order': return 'הוראת קבע';
+            case 'cash' :return 'מזומן';
             default: return method;
         }
     };
@@ -423,6 +430,7 @@ export default function Loans() {
             guarantors: []
         })
     }
+   
     return (
         <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
@@ -632,6 +640,24 @@ export default function Loans() {
                                                 }}>
                                                     {translateLoanStatus(loansMan.status)}
                                                 </span>
+
+                                                {openLoanId === loansMan.id && loansMan.guarantors && loansMan.guarantors.length > 0 && (
+                                                    <ul style={{ marginTop: "0.5em" }}>
+                                                        {loansMan.guarantors.map((g, idx) => (
+                                                            <li key={idx}>
+                                                                שם ערב: {g.guarantor?.fullName || "לא זמין"}
+                                                                {g.documentPath && (
+                                                                    <>
+                                                                        {" - "}
+                                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
+                                                                        <Button className="btn btn-dark" onClick={() => setShowModal(true)}> שטר חוב ערב</Button>
+                                                                    </>
+                                                                )}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+
+                                                )}
                                                 <div className="mt-3">
                                                     <strong style={{ display: "block", marginBottom: "4px" }}>תשלומים:</strong>
                                                     {loansMan.repayments?.length ? (
@@ -846,6 +872,7 @@ export default function Loans() {
                                 value={newLoan.typeOfPayment || 'check'}
                                 onChange={handleLoanChange}
                             >
+                                <option value="cash">מזומן</option>
                                 <option value="check">צ'ק</option>
                                 <option value="Standing_order">הוראת קבע</option>
                             </Form.Select>

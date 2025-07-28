@@ -44,7 +44,6 @@ const controller = {
     },
 
 
-    // שליפת הלוואה לפי מזהה
     GetLoanById: async (req, res) => {
         console.log('GetLoanById')
         try {
@@ -128,11 +127,11 @@ const controller = {
                     console.log(finalDocumentPath)
                     await Guarantor.create({
                         loanId: newLoan.id,
-                        PeopleId: borrowerId,
+                        PeopleId: g.PeopleId,
                         documentPath: finalDocumentPath
                     });
                 }
-                await createFundMovement(borrowerId, amount, 'loan_given', typeOfPayment, currency, notes, startDate);
+                await createFundMovement(borrowerId, amount, 'loan_given',currency, typeOfPayment, notes, startDate);
 
                 res.status(201).json({ loan: newLoan, message: 'Loan and guarantors created successfully' });
 
@@ -173,13 +172,12 @@ const controller = {
                     const existingMovement = await FundMovement.findOne({
                         where: {
                             personId: loan.borrowerId,
-                            type: 'loan_given',
-                            date: loan.startDate, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
+                            date: loan.startDate, 
                         },
                     });
 
                     if (existingMovement) {
-                        await existingMovement.update({ amount });
+                        await existingMovement.update({ amount,typeOfPayment, currency });
                         console.log('עודכנה תנועת קרן קיימת');
                     } else {
                         console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
@@ -232,6 +230,7 @@ const controller = {
 
                 // הכנסת ערבים חדשים
                 for (let i = 0; i < guarantors.length; i++) {
+                    console.log("SQWD",guarantors[i])
                     const g = guarantors[i];
                     const file = req.files.find(f => f.fieldname === `document${i}`);
                     let finalDocumentPath = null;
@@ -246,7 +245,7 @@ const controller = {
 
                     await Guarantor.create({
                         loanId: loan.id,
-                        PeopleId: borrowerId,
+                        PeopleId: g.PeopleId,
                         documentPath: finalDocumentPath
                     });
                 }
@@ -519,12 +518,10 @@ const controller = {
         try {
             const { personId } = req.params;
 
-            // כל ההלוואות של האדם כלווה
             const borrowerLoans = await Loan.findAll({
                 where: { borrowerId: personId }
             });
 
-            // מחלקים לפי סטטוס, עם איחוד של 'pending' ו-'partial'
             const borrowerLoansByStatus = {
                 pendingOrPartial: [],
                 paid: [],
@@ -573,7 +570,7 @@ const controller = {
             res.json({
                 borrower: borrowerLoansByStatus,
                 guarantor: guarantorLoansByStatus,
-                guarantorCount: guarantorLinks.length  // ← כאן הכמות הכוללת שהוא ערב
+                guarantorCount: guarantorLinks.length 
             });
         } catch (err) {
             console.error(err);

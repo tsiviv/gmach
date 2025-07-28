@@ -45,6 +45,7 @@ export const createFundMovement = async (personId, amount, type, description, da
 
 export const updateFundMovement = async (id, personId, amount, type, description, date,typeOfPayment,currency) => {
   try {
+    console.log(amount)
     const res = await api.put(`/FundMovement/${id}`, {
       personId: personId || null,
       amount,

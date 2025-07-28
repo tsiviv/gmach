@@ -11,7 +11,7 @@ loadEncryptedEnv(() => {
     const RepaymentRoute = require('./routes/RepaymentRoute');
     const fundMovementRoute = require('./routes/fundMovementRoute');
     const LoginRoute = require('./routes/LoginRoute');
-    const turnsRoute= require('./routes/turnsRoutes')
+    const turnsRoute = require('./routes/turnsRoutes')
     const DepositRoute = require('./routes/DepositRoute');
     const notificationsRouter = require('./routes/notifications');
     const { updateLoanStatuses } = require('./controllers/LoanController');
@@ -27,7 +27,7 @@ loadEncryptedEnv(() => {
         credentials: true
     }));
     app.use('/uploads', verifyToken, express.static('uploads'));
-
+    app.use(express.urlencoded({ extended: true }));
     process.on('SIGINT', gracefulShutdown);
     process.on('SIGTERM', gracefulShutdown);
     process.on('exit', gracefulShutdown);
@@ -49,8 +49,8 @@ loadEncryptedEnv(() => {
             await sendEmail();
         }
     });
-   
-    
+
+
 
     app.use('/Notification', verifyToken, notificationsRouter);
     app.use('/Loan', verifyToken, LoanRoute);

@@ -33,7 +33,7 @@ const Deposit = sequelize.define('Deposit', {
     allowNull: false,
   },
   typeOfPayment: {
-    type: DataTypes.ENUM('check', 'Standing_order'),
+    type: DataTypes.ENUM('check', 'Standing_order','cash'),
     allowNull: false,
     defaultValue: 'check',
   },

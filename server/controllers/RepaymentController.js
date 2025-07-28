@@ -61,7 +61,7 @@ module.exports = {
                 'repayment_received',
                 loan.currency,
                 loan.typeOfPayment,
-                `Repayment for loan #${loanId}`,
+                `תשלום עבור הלוואה מספר #${loanId}`,
                 paidDate,
             );
             res.status(201).json(repayment);

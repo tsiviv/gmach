@@ -44,7 +44,7 @@ async function sendEmail() {
         });
         const mailOptions = {
             from: process.env.SEND_EMAIL,
-            to: 't0527698098@gmail.com',
+            to: process.env.ENAIL_ADMIN,
             subject: "הלוואות שלא שולמו עדיין",
             html: generateEmailHTML(loans)
         };

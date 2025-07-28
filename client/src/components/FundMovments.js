@@ -32,7 +32,7 @@ export default function FundMovementsPage({ isAdmin }) {
         typeOfPayment: 'check',
         currency: 'shekel',
     });
-
+    const [toDate, setToDate] = useState('');
     const [pdfVisible, setPdfVisible] = useState(false);
     const [showMoney, setShowMoney] = useState(false);
     const [showPersonModal, setShowPersonModal] = useState(false);
@@ -43,13 +43,17 @@ export default function FundMovementsPage({ isAdmin }) {
     const [maxAmount, setMaxAmount] = useState('');
     const filteredmovements = movements.filter((movement) => {
         if (!selectedFilter) return true;
-
         if (selectedFilter === 'borrowerId') {
             return movement.person?.id.toString().includes(filterValue);
         }
 
         if (selectedFilter === 'name') {
             return movement.person?.fullName.toLowerCase().includes(filterValue.toLowerCase());
+        }
+
+        if (selectedFilter === 'dateRange') {
+            if (!fromDate || !toDate) return true;
+            return movement.date >= fromDate && movement.date <= toDate;
         }
 
         if (selectedFilter === 'date') {
@@ -66,15 +70,14 @@ export default function FundMovementsPage({ isAdmin }) {
 
         return true;
     });
-    const handleShowPdf = (personId) => {
+    const handleShowPdf = async (personMovements) => {
         const container = document.getElementById('pdf-container');
 
         if (pdfVisible) {
             container.innerHTML = '';
             setPdfVisible(false);
         } else {
-            const personMovements = movements.filter(m => m.personId === personId);
-            const url = generateMovmentReport(personMovements);
+            const url = await generateMovmentReport(personMovements);
             const iframe = document.createElement('iframe');
             iframe.src = url;
             iframe.width = '100%';
@@ -87,31 +90,37 @@ export default function FundMovementsPage({ isAdmin }) {
         }
     };
 
-
     useEffect(() => {
         loadMovements();
     }, []);
+    // פונקציה לסיכום יתרת תנועות לפי מטבע עבור אדם מסוים
     const countPersonBalance = (personId) => {
         const personMovements = movements.filter(m => m.personId === personId);
-        let sum = 0;
+        const balances = {};
 
         personMovements.forEach(element => {
+            console.log(element)
             const type = (element.type || '').toLowerCase().trim();
-            const amount = Number(element.amount) || 0;
-
+            const amount = element.amount
+            const currency = element.currency
+            if (currency !== "dollar" && currency !== "shekel")
+                return
+            if (!balances[currency]) {
+                balances[currency] = 0;
+            }
             if (['donation', 'deposit', 'repayment_received'].includes(type)) {
-                sum += amount;
+                balances[currency] += amount;
             } else {
-                sum -= amount;
+                balances[currency] -= amount;
             }
         });
-
-        return sum;
+        console.log(balances, "balances")
+        return balances;
     };
 
     const handleAmountChange = (e) => {
-        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
-        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
+        const rawValue = e.target.value.replace(/,/g, '');
+        if (!/^\d*$/.test(rawValue)) return;
 
         const numericValue = Number(rawValue);
         const formattedValue = format(numericValue);
@@ -120,25 +129,37 @@ export default function FundMovementsPage({ isAdmin }) {
             amount: formattedValue,
         }));
     };
+
     const countMoneyInKopa = (data) => {
-        let sum = 0;
+        const balances = {};
 
         data.forEach(element => {
             const type = (element.type || '').toLowerCase().trim();
             const amount = Number(element.amount) || 0;
+            const currency = element.currency;
+            console.log(element.currency, "DSFR")
+            if (currency !== 'shekel' && currency !== 'dollar') {
+                console.log(currency, "SWDF")
+                return;
+            }
 
-            if (type === 'manual_adjustment' || type === 'donation' || type === 'deposit' || type == 'repayment_received') {
-                sum += amount;
+            if (!balances[currency]) {
+                balances[currency] = 0;
+            }
+
+            if (['manual_adjustment', 'donation', 'deposit', 'repayment_received'].includes(type)) {
+                balances[currency] += amount;
             } else {
-                sum -= amount;
+                balances[currency] -= amount;
             }
         });
 
-        setMoneyInGmach(sum);
-    }
+        console.log(balances);
+        setMoneyInGmach(balances);
+    };
+
 
     function translateMovmemntType(MovmemntType) {
-        console.log(MovmemntType)
         const statusMap = {
             repayment_received: 'תשלום על הלוואה',
             loan_given: 'הלוואה',
@@ -230,15 +251,15 @@ export default function FundMovementsPage({ isAdmin }) {
             console.error('שגיאה בשמירת תנועה:', err);
         }
     };
-    const ShowPdf = (currentMovement, person) => {
+    const ShowPdf = async (currentMovement, person) => {
         const container = document.getElementById('pdf-container');
         if (pdfVisible) {
             container.innerHTML = '';
             setPdfVisible(false);
             return;
         }
-
-        const url = generateDonationReport(currentMovement, person);
+        console.log("dsafgf")
+        const url = await generateDonationReport(currentMovement, person);
 
         const closeButton = document.createElement('button');
         closeButton.textContent = 'סגור דוח';
@@ -277,6 +298,13 @@ export default function FundMovementsPage({ isAdmin }) {
             console.log(err)
         }
     }
+    const closePdfIfOpen = () => {
+        if (pdfVisible) {
+            setPdfVisible(false);
+            const container = document.getElementById('pdf-container');
+            if (container) container.innerHTML = '';
+        }
+    };
 
     return (
         <>
@@ -296,16 +324,39 @@ export default function FundMovementsPage({ isAdmin }) {
                                         setFilterValue('');
                                         setFromDate('');
                                         setMinAmount('');
+                                        closePdfIfOpen()
                                         setMaxAmount('');
                                     }}
                                 >
                                     <option value="">-- אין סינון --</option>
                                     <option value="borrowerId">תעודת זהות</option>
                                     <option value="name">שם</option> {/* הוספתי כאן */}
-                                    <option value="date">תאריך תשלום</option>
                                     <option value="amount">טווח סכום תשלום</option>
+                                    <option value="dateRange">טווח תאריכים</option>
                                 </Form.Select>
                             </div>
+                            {selectedFilter === 'dateRange' && (
+                                <>
+                                    <div className="col">
+                                        <Form.Label>מתאריך:</Form.Label>
+                                        <Form.Control
+                                            type="date"
+                                            value={fromDate}
+                                            onChange={(e) => {
+                                                setFromDate(e.target.value); closePdfIfOpen()
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="col">
+                                        <Form.Label>עד תאריך:</Form.Label>
+                                        <Form.Control
+                                            type="date"
+                                            value={toDate}
+                                            onChange={(e) => { setToDate(e.target.value); closePdfIfOpen() }}
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             {selectedFilter === 'borrowerId' ? (
                                 <div className="col">
@@ -313,32 +364,20 @@ export default function FundMovementsPage({ isAdmin }) {
                                     <Form.Control
                                         type="text"
                                         value={filterValue}
-                                        onChange={(e) => setFilterValue(e.target.value)}
+                                        onChange={(e) => { setFilterValue(e.target.value); closePdfIfOpen() }}
                                         placeholder={'לדוגמה: 123456789'}
                                     />
                                 </div>
                             ) : null}
 
-                            {selectedFilter === 'date' ? (
-                                <>
-                                    <div className="col">
-                                        <Form.Label> תאריך:</Form.Label>
-                                        <Form.Control
-                                            type="date"
-                                            value={fromDate}
-                                            onChange={(e) => setFromDate(e.target.value)}
-                                        />
-                                    </div>
-                                </>
-                            )
-                                : null}
+
                             {selectedFilter === 'name' ? (
                                 <div className="col">
                                     <Form.Label>הזן ערך לסינון:</Form.Label>
                                     <Form.Control
                                         type="text"
                                         value={filterValue}
-                                        onChange={(e) => setFilterValue(e.target.value)}
+                                        onChange={(e) => { setFilterValue(e.target.value); closePdfIfOpen() }}
                                         placeholder={'לדוגמה: ישראל ישראלי'}
                                     />
                                 </div>
@@ -350,15 +389,16 @@ export default function FundMovementsPage({ isAdmin }) {
                                         <Form.Control
                                             type="number"
                                             value={minAmount}
-                                            onChange={(e) => setMinAmount(e.target.value)}
+                                            onChange={(e) => { setMinAmount(e.target.value); closePdfIfOpen() }}
                                         />
+
                                     </div>
                                     <div className="col">
                                         <Form.Label>עד סכום:</Form.Label>
                                         <Form.Control
                                             type="number"
                                             value={maxAmount}
-                                            onChange={(e) => setMaxAmount(e.target.value)}
+                                            onChange={(e) => { setMaxAmount(e.target.value); closePdfIfOpen() }}
                                         />
                                     </div>
                                 </>
@@ -379,24 +419,53 @@ export default function FundMovementsPage({ isAdmin }) {
                             </div>
                         </div>
                     </Form>
-                    {!showMoney && filteredmovements.length > 0 &&
-                        filteredmovements.every(m => m.personId === filteredmovements[0].personId) ? (<>
-                            <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'blue' }}>
-                                סך הכל תנועות לאדם: {countPersonBalance(filteredmovements[0].personId).toLocaleString()} ₪
-                            </div>
-                            <Button onClick={() => handleShowPdf(filteredmovements[0].personId)}>
-                                {pdfVisible ? 'סגור דוח' : 'הצג דוח PDF'}
+
+                    {!showMoney && filteredmovements.length > 0 ? (
+                        filteredmovements.every(m => m.personId === filteredmovements[0].personId) ? (
+                            <>
+                                <span>                                              סך הכל תנועות לאדם:
+                                    {Object.entries(countPersonBalance(filteredmovements[0].personId)).map(([currency, amount]) => {
+                                        console.log(currency, amount)
+                                        const symbol = currency === 'shekel' ? '₪' : currency === 'dollar' ? '$' : currency;
+                                        return (
+                                            <span key={currency} style={{ marginLeft: '10px' }}>
+                                                {amount.toLocaleString()} {symbol}
+                                            </span>
+                                        );
+                                    })}
+                                </span>
+                                <Button onClick={() => handleShowPdf(filteredmovements)}>
+                                    {pdfVisible ? 'סגור דוח' : 'הצג דוח PDF'}
+                                </Button>
+                            </>
+                        ) : selectedFilter === 'dateRange' && fromDate && toDate ? (
+                            <Button
+                                className="mb-3"
+                                variant="success"
+                                onClick={() => handleShowPdf(filteredmovements)}
+                            >
+                                {pdfVisible ? 'סגור דוח' : 'הצג דוח לפי תאריכים'}
                             </Button>
-                        </>
-                    ) : !showMoney ? (
-                        <Button variant="warning" className="mb-3" onClick={() => { setShowMoney(true) }}>
-                            הצג כסף בגמח
-                        </Button>
+                        ) : (
+                            <Button variant="warning" className="mb-3" onClick={() => setShowMoney(true)}>
+                                הצג כסף בגמח
+                            </Button>
+                        )
                     ) : (
                         <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
-                            יש {MoneyInGmach.toLocaleString()} ₪ בגמח
+                            {console.log(MoneyInGmach)}
+                            {Object.entries(MoneyInGmach).map(([currency, amount]) => {
+                                const symbol = currency === 'shekel' ? '₪' : currency === 'dollar' ? '$' : currency;
+                                return (
+                                    <div key={currency}>
+                                        {`יש ${amount.toLocaleString()} ${symbol} בגמ"ח`}
+                                    </div>
+                                );
+                            })}
                         </div>
+
                     )}
+
                 </div>
                 <div id="pdf-container" className="mt-4"></div>
                 {!pdfVisible &&
@@ -438,99 +507,107 @@ export default function FundMovementsPage({ isAdmin }) {
                         <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
-                        <Form onSubmit={submitMovement} className="text-end">
+                        <Form onSubmit={submitMovement} dir="rtl" className="text-end">
                             <Form.Group className="mb-2">
-                                <Form.Label>סכום</Form.Label>
+                                <Form.Label className="float-end">סכום</Form.Label>
                                 <Form.Control
                                     type="text"
                                     name="amount"
                                     value={currentMovement.amount}
                                     onChange={handleAmountChange}
                                     required
+                                    style={{ textAlign: 'right' }}
                                 />
                             </Form.Group>
 
                             <Form.Group>
-                                <Form.Label>סוג</Form.Label>
-                                <Form.Control
-                                    as="select"
+                                <Form.Label className="float-end">סוג</Form.Label>
+                                <Form.Select
                                     name="type"
                                     value={currentMovement.type}
                                     onChange={handleChange}
                                     required
+                                    style={{ textAlign: 'right' }}
                                 >
                                     <option value="manual_adjustment">התאמה ידנית</option>
                                     <option value="donation">תרומה</option>
-                                </Form.Control>
+                                </Form.Select>
                             </Form.Group>
 
                             <Form.Group>
-                                <Form.Label>תיאור</Form.Label>
+                                <Form.Label className="float-end">תיאור</Form.Label>
                                 <Form.Control
                                     type="text"
                                     name="description"
                                     value={currentMovement.description}
                                     onChange={handleChange}
+                                    style={{ textAlign: 'right' }}
                                 />
                             </Form.Group>
 
                             <Form.Group>
-                                <Form.Label>תאריך</Form.Label>
+                                <Form.Label className="float-end">תאריך</Form.Label>
                                 <Form.Control
                                     type="date"
                                     name="date"
                                     value={currentMovement.date}
                                     onChange={handleChange}
                                     required
+                                    style={{ textAlign: 'right' }}
                                 />
                             </Form.Group>
+
                             <Form.Group>
-                                <Form.Label>אמצעי תשלום</Form.Label>
-                                <Form.Control
-                                    as="select"
+                                <Form.Label className="float-end">אמצעי תשלום</Form.Label>
+                                <Form.Select
                                     name="typeOfPayment"
                                     value={currentMovement.typeOfPayment}
                                     onChange={handleChange}
                                     required
+                                    style={{ textAlign: 'right' }}
                                 >
                                     <option value="check">צ'ק</option>
                                     <option value="Standing_order">הוראת קבע</option>
-                                </Form.Control>
+                                </Form.Select>
                             </Form.Group>
 
                             <Form.Group>
-                                <Form.Label>מטבע</Form.Label>
-                                <Form.Control
-                                    as="select"
+                                <Form.Label className="float-end">מטבע</Form.Label>
+                                <Form.Select
                                     name="currency"
                                     value={currentMovement.currency}
                                     onChange={handleChange}
                                     required
+                                    style={{ textAlign: 'right' }}
                                 >
                                     <option value="shekel">שקל</option>
                                     <option value="dollar">דולר</option>
-                                </Form.Control>
+                                </Form.Select>
                             </Form.Group>
 
                             {currentMovement.type !== 'manual_adjustment' && (
                                 <Form.Group>
-                                    <Form.Label>תעודת זהות</Form.Label>
+                                    <Form.Label className="float-end">תעודת זהות</Form.Label>
                                     <Form.Control
                                         type="text"
                                         name="personId"
                                         value={currentMovement.personId}
                                         onChange={handleChange}
                                         onBlur={() => handleIdBlur(currentMovement.personId)}
+                                        style={{ textAlign: 'right' }}
                                     />
                                 </Form.Group>
                             )}
 
-                            <Button type="submit" variant="primary" className="mt-3">
-                                {isEdit ? 'עדכן' : 'הוסף'}
-                            </Button>
+                            <div className="text-end mt-3">
+                                <Button type="submit" variant="primary">
+                                    {isEdit ? 'עדכן' : 'הוסף'}
+                                </Button>
+                            </div>
                         </Form>
                     </Modal.Body>
                 </Modal>
+
                 <ModelNewPerson showModal={showPersonModal} setShowModal={setShowPersonModal} />
             </div>
         </>

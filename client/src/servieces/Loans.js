@@ -38,7 +38,7 @@ export const CreateLoan = async (
   amountInMonth,
   guarantorsWithFiles = [],
   loanDocument = null,
-  typeOfPayment, 
+  typeOfPayment,
   currency,
   amountOfPament
 ) => {
@@ -57,18 +57,20 @@ export const CreateLoan = async (
     formData.append('typeOfPayment', typeOfPayment); // חדש
     formData.append('currency', currency);           // חדש
     console.log("createloan")
-    const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
-    formData.append('guarantors', JSON.stringify(guarantorsOnly));
 
     if (loanDocument instanceof File) {
       formData.append('loanDocument', loanDocument);
     }
 
+    const guarantorsOnly = guarantorsWithFiles.map(({ document, ...rest }) => rest);
+    formData.append('guarantors', JSON.stringify(guarantorsOnly));
+
     guarantorsWithFiles.forEach(({ document }, i) => {
-      if (document?.name && document?.type) {
+      if (document instanceof File) {
         formData.append(`document${i}`, document);
       }
     });
+
 
     const res = await api.post('/Loan', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -84,6 +86,7 @@ export const CreateLoan = async (
 export const GetLoanById = async (id) => {
   try {
     const res = await api.get(`/Loan/${id}`);
+    console.log("hi", res)
     return res.data;
   } catch (error) {
     console.error(`Error fetching loan ${id}:`, error);
@@ -115,7 +118,7 @@ export const UpdateLoan = async (
   guarantorsWithFiles = [],
   loanDocument = null,
   typeOfPayment,
-  currency,amountOfPament
+  currency, amountOfPament
 ) => {
   try {
     const formData = new FormData();
@@ -134,18 +137,21 @@ export const UpdateLoan = async (
 
     const guarantorsOnly = guarantorsWithFiles.map(({ file, ...rest }) => rest);
     formData.append('guarantors', JSON.stringify(guarantorsOnly));
-    
+
     if (loanDocument instanceof File) {
       formData.append('loanDocument', loanDocument);
     } else if (loanDocument) {
       formData.append('documentPath', loanDocument);
     }
 
-    guarantorsWithFiles.forEach(({ document }, i) => {
-      if (document?.name && document?.type) {
-        formData.append(`document${i}`, document);
+    guarantorsWithFiles.forEach((g, i) => {
+      formData.append(`guarantors[${i}].PeopleId`, g.PeopleId);
+      if (g.document instanceof File) {
+        formData.append(`document${i}`, g.document); // ✅ נכון, זה מה שהשרת מצפה לו
       }
+
     });
+
 
     const res = await api.put(`/Loan/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

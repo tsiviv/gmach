@@ -68,7 +68,7 @@ const Loan = sequelize.define('Loan', {
     allowNull: true
   },
   typeOfPayment: {
-    type: DataTypes.ENUM('check', 'Standing_order'),
+    type: DataTypes.ENUM('check', 'Standing_order','cash'),
     allowNull: false,
     defaultValue: 'once'
   },
