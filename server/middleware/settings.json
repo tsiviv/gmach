@@ -1,5 +1,5 @@
 {
-  "wantsNotifications": true,
+  "wantsNotifications": false,
   "requestCount": 5,
   "resetTime": 1749061110865,
   "logo": "logo.png",
