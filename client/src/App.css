@@ -10,6 +10,24 @@
   overflow: hidden;
 }
 
+.custom-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.custom-header .modal-title {
+  margin: 0;
+  text-align: right;
+  flex-grow: 1;
+}
+
+.custom-header .btn-close {
+  position: absolute;
+  left: 1rem;  /* מעביר את ה־X לצד שמאל */
+  right: auto;
+}
 
 .main {
   flex-grow: 1;

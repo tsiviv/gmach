@@ -23,9 +23,10 @@ const People = sequelize.define('People', {
   notes: {
     type: DataTypes.TEXT,
   },
+
 }, {
   tableName: 'people',
-  timestamps: false,
+  timestamps: true,
 });
 
 module.exports = People;

@@ -24,9 +24,15 @@ const Deposit = sequelize.define('Deposit', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  balanceAfter: {
+  balanceShekel: {
     type: DataTypes.INTEGER,
     allowNull: false,
+    defaultValue: 0
+  },
+  balanceDollar: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0
   },
   method: {
     type: DataTypes.ENUM('deposit', 'deposit_pull'),

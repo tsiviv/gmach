@@ -5,22 +5,34 @@ module.exports = {
   // שליפת כל הפקדות/משיכות
   GetAllTurns: async (req, res) => {
     try {
-      const turns = await Turns.findAll({
+      const page = parseInt(req.query.page) || 1; // דף נוכחי
+      const limit = parseInt(req.query.limit) || 20; // מספר הרשומות בדף
+      const offset = (page - 1) * limit;
+
+      const { count, rows } = await Turns.findAndCountAll({
         include: [
           {
             model: People,
             as: 'person',
-            attributes: ['id', 'fullName'] 
+            attributes: ['id', 'fullName']
           }
-        ]
+        ],
+        order: [['date', 'DESC']], // או שדה מתאים אחר למיון
+        offset,
+        limit
       });
-      res.json(turns);
+
+      res.json({
+        data: rows,
+        total: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   },
 
-  // שליפת פעולה לפי מזהה
   GetTurnById: async (req, res) => {
     try {
       const { id } = req.params;

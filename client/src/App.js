@@ -14,7 +14,10 @@ import './styles/colors.css';
 import { Notification } from './components/Notification';
 import Turns from './components/Turns';
 import { MonthlyChecksNotification } from './components/Remainings';
+import { useEffect } from 'react';
+
 function App() {
+
   return (
     <Router>
       <div className="layout" dir="rtl">

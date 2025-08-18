@@ -13,8 +13,8 @@ set /p ENV_PASS=
 set "NODE_ENV_PASS=%ENV_PASS%"
 
 :: התקנת jsonwebtoken
-echo 📦 jsonwebtoken תקלדה...
-call npm install jsonwebtoken
+:: echo 📦 jsonwebtoken תקלדה...
+:: call npm install jsonwebtoken
 
 echo 🚀 תרשה תא ץירמ...
 call npm run secure-start

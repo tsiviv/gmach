@@ -4,45 +4,55 @@ import { FaSyncAlt, FaBell, FaClock, FaEdit } from 'react-icons/fa';
 import TooltipWrapper from './TooltipWrapper';
 import '../styles/Header.css';
 import { updateLoanStatusApi } from '../servieces/Loans';
-import { title as defaultTitle } from './config';
 import { updateSiteTitle, uploadLogo, getSiteDetails } from '../servieces/Login'
 
 export default function Header() {
   const navigate = useNavigate();
-  const [token, settoken] = useState();
+  const [token, settoken] = useState(sessionStorage.getItem('token') || null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [hoverLogo, setHoverLogo] = useState(false);
   const [hoverTitle, setHoverTitle] = useState(false);
-
+  const [titleChange, setTitleChange] = useState(false);
   const fileInputRef = useRef(null);
-  const [siteTitle, setSiteTitle] = useState(localStorage.getItem('siteTitle') || "hi");
-  const [logoUrl, setLogoUrl] = useState();
-useEffect(() => {
-  const tokenFromStorage = sessionStorage.getItem('token');
-  settoken(tokenFromStorage);
-}, []);
+  const [siteTitle, setSiteTitle] = useState(sessionStorage.getItem('siteTitle') || "hi");
+  const [logoUrl, setLogoUrl] = useState(`http://localhost:4000/uploads/logo.png?token=${sessionStorage.getItem('token')}`);
 
   useEffect(() => {
-  if (!token) return;
+    const siteTitle = sessionStorage.getItem("siteTitle") || "ניהול גמח";
+    document.title = siteTitle;
+  }, [titleChange]);
 
-  const fetchDetails = async () => {
-    try {
-      const data = await getSiteDetails();
-      if (data.name) {
-        setSiteTitle(data.name);
-        localStorage.setItem('siteTitle', data.name);
-      }
-      if (data.logo) {
-        // תוסיף timestamp כדי לעקוף cache
-        setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}&t=${Date.now()}`);
-      }
-    } catch (error) {
-      console.error('שגיאה בקבלת פרטי האתר:', error);
-    }
-  };
+  useEffect(() => {
+    const onStorageChange = () => {
+      const tokenFromStorage = sessionStorage.getItem("token");
+      settoken(tokenFromStorage);
+    };
 
-  fetchDetails();
-}, [token]); // יפעל רק כשהtoken נטען
+    window.addEventListener("storage", onStorageChange);
+    return () => window.removeEventListener("storage", onStorageChange);
+  }, []);
+
+
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchDetails = async () => {
+      try {
+        const data = await getSiteDetails();
+        if (data.name) {
+          setSiteTitle(data.name);
+          sessionStorage.setItem('siteTitle', data.name);
+        }
+        if (data.logo) {
+          setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}`);
+        }
+      } catch (error) {
+        console.error('שגיאה בקבלת פרטי האתר:', error);
+      }
+    };
+
+    fetchDetails();
+  }, [token]); // יפעל רק כשהtoken נטען
 
 
   const logout = () => {
@@ -71,7 +81,7 @@ useEffect(() => {
       await uploadLogo(file, siteTitle);
       const data = await getSiteDetails();
       setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}&t=${Date.now()}`);
-      localStorage.setItem('logoUrl', data.logo);
+      sessionStorage.setItem('logoUrl', data.logo);
     } catch (error) {
       console.error('שגיאה בהעלאת לוגו:', error);
     }
@@ -81,7 +91,8 @@ useEffect(() => {
     setEditingTitle(false);
     try {
       await updateSiteTitle(siteTitle);
-      localStorage.setItem('siteTitle', siteTitle);
+      sessionStorage.setItem('siteTitle', siteTitle);
+      setTitleChange(titleChange ? false : true)
     } catch (e) {
       console.error('שגיאה בעדכון השם:', e);
     }

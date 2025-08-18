@@ -7,9 +7,8 @@ const generateToken = (email,role) => {
     try {
         const token = jwt.sign({ role: role, email: email }, privateKey, {
             algorithm: 'RS256',
-            expiresIn: '24h',
+            expiresIn: '1h',
         });
-        console.log(token)
         return token
     } catch (error) {
         console.error('JWT error:', error);

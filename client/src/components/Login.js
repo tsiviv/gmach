@@ -5,15 +5,14 @@ const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
-    const navigate=useNavigate()
+    const navigate = useNavigate()
     const fetch = async (e) => {
         e.preventDefault();
         try {
-            const res = await LoginAdmin(email,password)
-            console.log(res)
+            const res = await LoginAdmin(email, password)
             sessionStorage.setItem('token', res.token)
-            console.log("d")
             navigate('/people')
+            window.dispatchEvent(new Event("storage"));
         }
         catch (err) {
             console.log(err)

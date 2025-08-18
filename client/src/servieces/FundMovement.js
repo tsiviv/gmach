@@ -8,7 +8,6 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('token');
-    console.log('JWT Token:', token); // בדיקה
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -17,10 +16,12 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export const getAllMovements = async () => {
+export const getAllMovements = async (page = 1, limit = 20) => {
   try {
-    const res = await api.get('/FundMovement');
-    return res.data;
+    const res = await api.get('/FundMovement', {
+      params: { page, limit }
+    });
+    return res.data; // יכיל: data, total, totalPages, currentPage
   } catch (error) {
     console.error('שגיאה בקבלת תנועות הקרן:', error);
     throw error;

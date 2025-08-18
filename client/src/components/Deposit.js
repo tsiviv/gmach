@@ -30,21 +30,30 @@ export default function Deposite() {
     const [searchName, setSearchName] = useState('');
     const [searchId, setSearchId] = useState('');
     const [searchMethod, setSearchMethod] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(50);
 
     useEffect(() => {
-        loadDeposites();
-    }, []);
+        loadDeposites(currentPage);
+    }, [currentPage]);
 
-    const loadDeposites = async () => {
+    const loadDeposites = async (page) => {
         try {
-            const data = await getAllDeposits();
-            setDeposites(data);
-            console.log(data)
+            const res = await getAllDeposits(page, pageSize); // קריאה עם דף ומספר רשומות
+            setDeposites(res.data);
+            setTotalPages(res.totalPages); // להחזיר מהשרת
         } catch (err) {
-            if (err.response?.status === 403 || err.response?.status === 401) {
-                navigate('../');
-            }
+            console.error('שגיאה בטעינת הפקדות:', err);
         }
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
     };
 
     const handleChange = (e) => {
@@ -108,7 +117,16 @@ export default function Deposite() {
                 await deleteDeposit(id);
                 loadDeposites();
             } catch (err) {
-                alert('שגיאה במחיקת תנועה');
+                console.log(err)
+                if (err.response) {
+                    if (err.response.status === 400) {
+                        alert(`שגיאה: ${err.response.data.error || 'בקשה לא חוקית'}`);
+                    } else {
+                        alert(`שגיאה בשרת (${err.response.status})`);
+                    }
+                } else {
+                    alert(`שגיאת רשת: ${err.message}`);
+                }
             }
         }
     };
@@ -120,7 +138,6 @@ export default function Deposite() {
 
     const handleSubmit = async (e) => {
         e.preventDefault(currentDeposite);
-        console.log()
         if (!currentDeposite.PeopleId) {
             setError('יש להזין תעודת זהות');
             return;
@@ -129,16 +146,14 @@ export default function Deposite() {
             setError('יש להזין סכום');
             return;
         }
-        let balancePreson = 0;
+        let balancePresonShekel = 0;
+        let balancePresonDollar = 0;
         try {
             const res = await getCurrentBalance(currentDeposite.PeopleId);
-            balancePreson = res.balance;
+            balancePresonShekel = res.balanceShekel;
+            balancePresonDollar = res.balanceDollar
         } catch (e) {
             console.log(e);
-        }
-        if (currentDeposite.method === "deposit_pull" && balancePreson - currentDeposite.amount < 0) {
-            setError('אין יתרה מספיקה למשיכה');
-            return;
         }
         try {
             if (isEdit) {
@@ -163,13 +178,16 @@ export default function Deposite() {
                     alldepsoit = await getDepositsByPersonId(currentDeposite.PeopleId);
                     person = await GetPersonById(currentDeposite.PeopleId);
                     const res = await getCurrentBalance(currentDeposite.PeopleId);
-                    balancePreson = res.balance;
-                    currentDeposite.amount=Number(currentDeposite.amount.replace(/,/g, '').trim());
+                    console.log(res)
+                    balancePresonShekel = res.balanceShekel;
+                    balancePresonDollar = res.balanceDollar
+                    currentDeposite.amount = Number(currentDeposite.amount.replace(/,/g, '').trim());
                 } catch (e) {
                     console.log(e);
                 }
-                handleShowPdf(currentDeposite, person, balancePreson, alldepsoit)
+                handleShowPdf(currentDeposite, person, balancePresonShekel, balancePresonDollar, alldepsoit)
             }
+            setError("")
             handleClose();
         } catch (err) {
             setError(err?.response?.data?.error || 'שגיאה בלתי צפויה');
@@ -184,8 +202,8 @@ export default function Deposite() {
             default: return method;
         }
     };
-    const handleShowPdf = async (deposite, person, balancePreson, history) => {
-        const url = await generateDepositReport(deposite, person, balancePreson, history);
+    const handleShowPdf = async (deposite, person,balancePresonShekel, balancePresonDollar, history) => {
+        const url = await generateDepositReport(deposite, person, balancePresonShekel, balancePresonDollar, history);
 
         const container = document.getElementById('pdf-container-2');
         container.innerHTML = ''; // ריקון לפני יצירה
@@ -292,7 +310,7 @@ export default function Deposite() {
             <Table striped bordered hover>
                 <thead>
                     <tr>
-                        <th>ת"ז</th><th>שם</th><th>סכום</th><th>שיטת תשלום</th><th>סוג פעולה</th><th>יתרת הפקדה</th><th>תיאור</th><th>תאריך</th><th>פעולות</th>
+                        <th>ת"ז</th><th>שם</th><th>סכום</th><th>שיטת תשלום</th><th>סוג פעולה</th><th>יתרת הפקדה בדולרים</th><th> יתרת הפקדה בשקלים</th><th>תיאור</th><th>תאריך</th><th>פעולות</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -303,7 +321,8 @@ export default function Deposite() {
                             <td>{formatAmount(Deposite.amount, Deposite.currency)}</td>
                             <td>{translateMethod(Deposite.typeOfPayment)}</td>
                             <td>{Deposite.isDeposit ? 'הפקדה' : 'משיכה'}</td>
-                            <td>{formatAmount(Deposite.balanceAfter, Deposite.currency)}</td>
+                            <td>{formatAmount(Deposite.balanceDollar, "dollar")}</td>
+                            <td>{formatAmount(Deposite.balanceShekel, "shekel")}</td>
                             <td>{Deposite.description}</td>
                             <td>{Deposite.date ? Deposite.date.split('T')[0] : ''}</td>
                             <td>
@@ -314,10 +333,16 @@ export default function Deposite() {
                     ))}
                 </tbody>
             </Table>
-
+            <div className="d-flex justify-content-between">
+                <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                <span>דף {currentPage} מתוך {totalPages}</span>
+                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+            </div>
             <Modal show={showModal} onHide={handleClose} dir="rtl">
-                <Modal.Header closeButton>
-                    <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
+                <Modal.Header closeButton className="custom-header">
+                    <Modal.Title>
+                        {isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}
+                    </Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <Form onSubmit={handleSubmit} className="text-end" dir="rtl">

@@ -7,7 +7,7 @@ import Form from 'react-bootstrap/Form';
 import { GetLoansByGuarantor, CreatePerson, DeletePerson, GetLoansByPerson, GetAllPeople, UpdatePerson } from '../servieces/People';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from './ModelNewPerson';
-import { getDepositsByPersonId } from '../servieces/Deposit';
+import { getCurrentBalance, getDepositsByPersonId } from '../servieces/Deposit';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { formatAmount } from './helper'
 import { generatePersonReport } from './GenerateReport';
@@ -36,7 +36,9 @@ function People() {
     const [dep, setdep] = useState()
     const [pdfVisible, setPdfVisible] = useState(false);
     const token = sessionStorage.getItem('token');
-
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(50); // מספר רשומות לדף
     const filteredpeople = people.filter((person) => {
         if (!selectedFilter) return true;
         if (selectedFilter === 'borrowerId') return person.id.toString().includes(filterValue);
@@ -45,7 +47,6 @@ function People() {
         return true;
     });
 
-    const getTotalLoanAmount = () => loans.reduce((sum, l) => sum + l.amount, 0);
 
     const translateLoanStatus = (status) => {
         const statusMap = {
@@ -59,11 +60,21 @@ function People() {
         return statusMap[status] || 'לא ידוע';
     };
 
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
     useEffect(() => {
         const fetch = async () => {
             try {
-                const res = await GetAllPeople();
-                setPeople(res);
+                const res = await GetAllPeople(currentPage, pageSize);
+                setPeople(res.data);
+                setTotalPages(res.totalPages);
+                console.log(res)
                 if (location.state?.openPersonId) {
                     const personIdToOpen = location.state.openPersonId;
                     setTimeout(() => {
@@ -84,7 +95,7 @@ function People() {
             }
         };
         fetch();
-    }, [showPersonModal, render]);
+    }, [showPersonModal, render, currentPage]);
 
     const countAmountLeft = (loan) => {
         let total = loan.amount
@@ -115,12 +126,11 @@ function People() {
     const showLoans = async (id) => {
         try {
             const res = await GetLoansByPerson(id);
-            const res2 = await getDepositsByPersonId(id);
+            const res2 = await getCurrentBalance(id);
             setdep(res2)
-            setdeposit(calculateDepositStats(res2));
+            setdeposit(res2);
             setloans(res);
             setOpenLoanId(openLoanId === res[0].id ? null : res[0].id)
-            console.log("res", res2)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) navigate('../');
             else console.log(err);
@@ -275,6 +285,7 @@ function People() {
                                                     📆 סכום לחודש: {formatAmount(loan.amountInMonth, loan.currency) ?? 'לא זמין'}<br />
                                                     📅 יום בחודש: {loan.repaymentDay ?? 'לא צוין'}<br />
                                                     📊 כמות תשלומים: {loan.amountOfPament ?? 'לא זמין'}<br />
+                                                    כמות איחורים להלוואה זו: {loan.lateCount}<br />
                                                     {loan.documentPath ? <div>
                                                         <Button variant="dark"
                                                             onClick={() => setShowDocumentModal(true)}>שטר חוב </Button>
@@ -334,15 +345,7 @@ function People() {
                                                         )}
 
                                                     </div>
-                                                    {showDeposits[loan.id] && deposit.length>0 && (
-                                                        <div className="mt-2">
-                                                            <p>
-                                                                יתרת הפקדות: {formatAmount(deposit.balance, deposit.cureency)}<br></br>
-                                                                💰 סך הפקדות: {formatAmount(deposit.totalDeposits.check, deposit.cureency)}<br />
-                                                                💸 סך משיכות: {formatAmount(deposit.totalPulls.check, deposit.cureency)}
-                                                            </p>
-                                                        </div>
-                                                    )}
+
                                                     {showRepayments[loan.id] && loan.repayments.length && (
                                                         <div className="mt-2">
                                                             <Table striped bordered size="sm">
@@ -369,7 +372,43 @@ function People() {
                                                     )}
                                                 </li>
                                             ))}
+
                                         </ul>
+                                        {deposit && (
+                                            <div className="mt-3">
+                                                <Button
+                                                    variant="outline-success"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setShowDeposits(prev => ({ ...prev, [p.id]: !prev[p.id] }))
+                                                    }
+                                                >
+                                                    {showDeposits[p.id] ? 'הסתר הפקדות' : 'הצג הפקדות'}
+                                                </Button>
+
+                                                {showDeposits[p.id] && (
+                                                    <Table striped bordered size="sm" className="mt-2">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>סוג הפקדה</th>
+                                                                <th>סכום</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>יתרת הפקדות בשקלים</td>
+                                                                <td>{formatAmount(deposit.balanceShekel, "shekel")}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>יתרת הפקדות בדולרים</td>
+                                                                <td>{formatAmount(deposit.balanceDollar, "dollar")}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </Table>
+                                                )}
+                                            </div>
+                                        )}
+
                                     </td>
                                 </tr>
                             )}
@@ -377,7 +416,11 @@ function People() {
                     ))}
                 </tbody>
             </Table>
-
+            <div className="d-flex justify-content-between">
+                <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                <span>דף {currentPage} מתוך {totalPages}</span>
+                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+            </div>
 
             <ModelNewPerson showModal={showPersonModal} updatePerson={newPerson} setShowModal={setShowPersonModal} isEdit={isEdit} setisEdit={setisEdit} />
         </div>

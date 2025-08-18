@@ -7,11 +7,10 @@ import { useNavigate } from 'react-router-dom';
 
 const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEdit }) => {
     useEffect(() => {
-        console.log(isEdit,"updatePerson")
-        if(isEdit){
-            console.log(updatePerson)
-            setNewPerson(updatePerson)}
-     }, [showModal])
+        if (isEdit) {
+            setNewPerson(updatePerson)
+        }
+    }, [showModal])
     const [error, setError] = useState("");
     const navigate = useNavigate();
     const [newPerson, setNewPerson] = useState({
@@ -32,15 +31,14 @@ const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEd
             notes: '',
             id: ''
         });
-        if(isEdit)
-        setisEdit(false)
+        if (isEdit)
+            setisEdit(false)
     };
     const handleChange = (e) => {
         setNewPerson({ ...newPerson, [e.target.name]: e.target.value });
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Submitting new person:', newPerson);
         try {
             let res;
             if (isEdit)
@@ -60,7 +58,7 @@ const ModelNewPerson = ({ showModal, setShowModal, updatePerson, isEdit, setisEd
     };
     return <>
         <Modal show={showModal} onHide={handleClose} dir="rtl">
-            <Modal.Header closeButton>
+            <Modal.Header closeButton className="custom-header">
                 <Modal.Title> {isEdit ? 'טופס עדכון' : 'טופס צור איש'} </Modal.Title>
             </Modal.Header>
             <Modal.Body>

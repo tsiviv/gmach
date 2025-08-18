@@ -16,15 +16,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export const GetAllRepayments = async () => {
+export const GetAllRepayments = async (page = 1, limit = 20) => {
   try {
-    const res = await api.get('/Repayment');
-    return res.data;
+    const res = await api.get('/Repayment', {
+      params: { page, limit }
+    });
+    return res.data; // מכיל data, total, totalPages, currentPage
   } catch (error) {
     console.error('שגיאה בקבלת תשלומים:', error);
     throw error;
   }
 };
+
 
 export const CreateRepayment = async (loanId, Guarantor, amount, paidDate, notes) => {
   try {

@@ -17,15 +17,18 @@ api.interceptors.request.use(
 );
 
 // כל התנועות (Turns)
-export const getAllTurns = async () => {
-    try {
-        const res = await api.get('/Turn');
-        return res.data;
-    } catch (error) {
-        console.error('שגיאה בקבלת תנועות:', error);
-        throw error;
-    }
+export const getAllTurns = async (page = 1, limit = 20) => {
+  try {
+    const res = await api.get('/Turn', {
+      params: { page, limit }
+    });
+    return res.data; // data, total, totalPages, currentPage
+  } catch (error) {
+    console.error('שגיאה בקבלת תנועות:', error);
+    throw error;
+  }
 };
+
 
 // תנועות לפי מזהה אדם
 // export const getTurnsByPersonId = async (personId) => {

@@ -5,7 +5,6 @@ module.exports = {
   createMovement: async (req, res) => {
     try {
       const { personId, amount, type, description, date, typeOfPayment, currency } = req.body;
-      console.log(typeOfPayment)
       const movement = await FundMovement.create({ personId, amount, type, description, date, typeOfPayment, currency });
       res.status(201).json(movement);
     } catch (err) {
@@ -18,7 +17,6 @@ module.exports = {
       const { id } = req.params;
       const movement = await FundMovement.findByPk(id);
       const { personId, amount, type, description, date, typeOfPayment, currency } = req.body;
-      console.log(typeOfPayment)
       await movement.update({ personId, amount, type, description, date, typeOfPayment, currency })
       res.status(201).json(movement);
     } catch (err) {
@@ -39,27 +37,37 @@ module.exports = {
     }
   },
   getAllMovements: async (req, res) => {
-    try {
-      const movements = await FundMovement.findAll({
-        include: [
-          {
-            model: People,
-            as: 'person',
-            attributes: ['id', 'fullName']
-          }
-        ],
-        order: [['date', 'DESC']]
-      });
+  try {
+    const page = parseInt(req.query.page) || 1; // דף נוכחי
+    const limit = parseInt(req.query.limit) || 20; // מספר הרשומות בדף
+    const offset = (page - 1) * limit;
 
-      res.json(movements);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+    const { count, rows } = await FundMovement.findAndCountAll({
+      include: [
+        {
+          model: People,
+          as: 'person',
+          attributes: ['id', 'fullName']
+        }
+      ],
+      order: [['date', 'DESC']],
+      offset,
+      limit
+    });
+
+    res.json({
+      data: rows,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+},
+
   createFundMovement: async function (personId, amount, type, currency, typeOfPayment, description = '', date = new Date()) {
-    console.log("create", personId, amount, type, typeOfPayment)
     if (!personId || !amount || !type) {
-      console.log(personId, amount, type, description)
       throw new Error('Missing required fields');
     }
 
@@ -75,7 +83,6 @@ module.exports = {
   },
 
   updateMovementByOldAndNewData: async function (oldData, newData) {
-    console.log(oldData)
     const whereConditions = {
       personId: oldData.PeopleId,
       amount: oldData.amount,

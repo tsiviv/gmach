@@ -9,7 +9,7 @@ import {
 import ModelNewPerson from './ModelNewPerson';
 import { GetPersonById } from '../servieces/People';
 import { useNavigate } from 'react-router-dom';
-import { formatAmount,format } from './helper'
+import { formatAmount, format } from './helper'
 
 export default function Turns() {
     const [turns, setTurns] = useState([]);
@@ -30,7 +30,9 @@ export default function Turns() {
     const [filterValue, setFilterValue] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
-
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(50); // מספר רשומות לדף
     const filteredTurns = turns.filter((turn) => {
         if (!selectedFilter) return true;
         if (selectedFilter === 'personId') {
@@ -45,14 +47,24 @@ export default function Turns() {
         return true;
     });
 
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
     useEffect(() => {
         loadTurns();
-    }, []);
+    }, [currentPage]);
 
     const loadTurns = async () => {
         try {
-            const data = await getAllTurns();
-            setTurns(data);
+            const data = await getAllTurns(currentPage, pageSize);
+            console.log(data)
+            setTotalPages(data.totalPages)
+            setTurns(data.data);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../');
@@ -257,9 +269,13 @@ export default function Turns() {
                     ))}
                 </tbody>
             </Table>
-
+            <div className="d-flex justify-content-between">
+                <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                <span>דף {currentPage} מתוך {totalPages}</span>
+                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+            </div>
             <Modal show={showModal} onHide={handleClose} dir="rtl">
-                <Modal.Header closeButton>
+                <Modal.Header closeButton className="custom-header">
                     <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>

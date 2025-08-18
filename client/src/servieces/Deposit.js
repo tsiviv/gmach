@@ -24,10 +24,12 @@ export const updateDeposit = async (id,deposit) => {
   }
 };
 
-export const getAllDeposits = async () => {
+export const getAllDeposits = async (page = 1, limit = 20) => {
   try {
-    const res = await api.get('/Deposit');
-    return res.data;
+    const res = await api.get('/Deposit', {
+      params: { page, limit }
+    });
+    return res.data; // זה יכיל: data, total, totalPages, currentPage
   } catch (error) {
     console.error('שגיאה בקבלת תנועות הקרן:', error);
     throw error;

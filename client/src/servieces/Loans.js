@@ -16,10 +16,12 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export const GetAllLoans = async () => {
+export const GetAllLoans = async (page = 1, limit = 20) => {
   try {
-    const res = await api.get('/Loan');
-    return res.data;
+    const res = await api.get('/Loan', {
+      params: { page, limit }
+    });
+    return res.data; // יכיל: data, total, totalPages, currentPage
   } catch (error) {
     console.error('Error fetching all loans:', error);
     throw error;

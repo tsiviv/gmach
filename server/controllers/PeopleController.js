@@ -7,12 +7,26 @@ module.exports = {
   // קבלת כל האנשים
   GetAllPeople: async (req, res) => {
     try {
-      const people = await People.findAll();
-      res.json(people);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = (page - 1) * limit;
+
+        const { rows, count } = await People.findAndCountAll({
+            offset,
+            limit,
+            order: [['createdAt', 'DESC']], 
+        });
+
+        res.json({
+            data: rows,
+            total: count,
+            totalPages: Math.ceil(count / limit),
+        });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message });
     }
-  },
+},
+
 
   // קבלת אדם לפי ID
   GetPersonById: async (req, res) => {
@@ -54,7 +68,6 @@ module.exports = {
           }
         ]
       });
-      console.log(loans)
       res.json(loans);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -65,7 +78,6 @@ module.exports = {
   CreatePerson: async (req, res) => {
     try {
       const { id, fullName, phone, address, email, notes } = req.body;
-      console.log(fullName)
       const IsPerson = await People.findByPk(id);
       if (IsPerson)
         res.status(404).json("איש כבר קיים");
@@ -107,7 +119,6 @@ module.exports = {
     try {
       const { id } = req.params;
       const { fullName, phone, address, email, notes } = req.body;
-      console.log(fullName)
       const [updated] = await People.update(
         { fullName, phone, address, email, notes },
         { where: { id } }

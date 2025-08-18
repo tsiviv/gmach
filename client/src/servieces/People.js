@@ -19,11 +19,18 @@ api.interceptors.request.use((config) => {
 });
 
 // ואז תשתמש ב־api במקום axios:
-
-export const GetAllPeople = async () => {
-    const res = await api.get('/People');
-    return res.data;
+export const GetAllPeople = async (page = 1, limit = 20) => {
+  try {
+    const res = await api.get('/People', {
+      params: { page, limit }
+    });
+    return res.data; // יכיל data, total, totalPages, currentPage
+  } catch (error) {
+    console.error('Error fetching all people:', error);
+    throw error;
+  }
 };
+
 
 export const CreatePerson = async (id, fullName, phone, address, email, notes) => {
     const res = await api.post('/People', { id, fullName, phone, address, email, notes });

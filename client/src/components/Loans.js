@@ -47,6 +47,9 @@ export default function Loans() {
     const [maxAmount, setMaxAmount] = useState('');
     const [pdfVisible, setPdfVisible] = useState(false);
     const [openLoanId, setOpenLoanId] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(50); // מספר רשומות לדף
     const filteredLonas = loans.filter((loan) => {
         if (!selectedFilter) return true;
 
@@ -55,7 +58,7 @@ export default function Loans() {
         }
 
         if (selectedFilter === 'name') {
-            return loan.borrower.fullName.toLowerCase().includes(filterValue.toLowerCase());
+            return loan.borrower.fullName.toLowerCase().includes(filterValue);
         }
         if (selectedFilter === 'status') {
             return loan.status.toLowerCase().includes(filterValue.toLowerCase());
@@ -101,7 +104,6 @@ export default function Loans() {
         }));
     };
     const countAmountLeft = (loan) => {
-        console.log("l", loan)
         let total = loan.amount
         loan.repayments?.forEach(element => {
             total -= element.amount
@@ -142,7 +144,6 @@ export default function Loans() {
     const toggleRow = async (id) => {
         try {
             const res = await GetLoanById(id);
-            console.log("reasds", res)
             setloansMan(res);
             setOpenLoanId(openLoanId === id ? null : id)
         } catch (err) {
@@ -157,8 +158,9 @@ export default function Loans() {
     useEffect(() => {
         async function fetchData() {
             try {
-                const allLoans = await GetAllLoans();
-                setLoans(allLoans);
+                const allLoans = await GetAllLoans(currentPage, pageSize);
+                setLoans(allLoans.data);
+                setTotalPages(allLoans.totalPages);
                 console.log(allLoans)
             } catch (err) {
                 if (err.response?.status === 403 || err.response?.status === 401) {
@@ -168,14 +170,13 @@ export default function Loans() {
         }
 
         fetchData();
-    }, [showLoanModal, render]);
+    }, [showLoanModal, render, currentPage]);
 
     const handleLoanChange = (e) => {
         const { name, value } = e.target;
         setNewLoan({ ...newLoan, [name]: value });
     };
     const handleIdBlurGuarantor = async (id, index) => {
-        console.log("on")
         if (id == newLoan.borrowerId) {
             alert('תעודת זהות של הערב היא תעודת זהות של הלווה')
             const updated = [...newLoan.guarantors];
@@ -193,7 +194,6 @@ export default function Loans() {
             }
             else {
                 const res = await GetLoanStatusSummary(id)
-                console.log(res)
                 const issues = [];
                 if (res.guarantorCount > 0) {
                     issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
@@ -226,10 +226,8 @@ export default function Loans() {
         }
     }
     const handleIdBlur = async (id) => {
-        console.log("on")
         try {
             const existingPerson = await GetPersonById(id);
-            console.log(existingPerson)
             if (!existingPerson) {
                 setShowAddPersonModal(true);
                 setNewLoan({ ...newLoan, ['borrowerId']: '' });
@@ -237,10 +235,8 @@ export default function Loans() {
             else {
                 const issues = [];
                 const res = await GetLoanStatusSummary(id)
-                console.log(res)
                 if (res.borrower.pendingOrPartial.length != 0) {
                     alert('למשתמש זה יש כבר הלוואה שעדיין פעילה')
-                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
                     return
                 }
 
@@ -318,11 +314,9 @@ export default function Loans() {
 
     const update = async (LoanToUpdate) => {
         setidUpdate(LoanToUpdate.id)
-        console.log(LoanToUpdate)
         let res
         try {
             res = await GetLoanById(LoanToUpdate.id);
-            console.log("AD", res.guarantors)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../')
@@ -369,9 +363,8 @@ export default function Loans() {
         const date = new Date(dateString);
 
         const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // חודשים מתחילים מ-0
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const year = date.getFullYear();
-
 
         return `${day}/${month}/${year} `;
     }
@@ -406,10 +399,18 @@ export default function Loans() {
         switch (method) {
             case 'check': return "צ'ק";
             case 'Standing_order': return 'הוראת קבע';
-            case 'cash' :return 'מזומן';
+            case 'cash': return 'מזומן';
             default: return method;
         }
     };
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
     const openShowLoanModal = () => {
         setShowLoanModal(true)
         setisEdit(false)
@@ -430,7 +431,7 @@ export default function Loans() {
             guarantors: []
         })
     }
-   
+
     return (
         <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
@@ -624,11 +625,22 @@ export default function Loans() {
                                                     {pdfVisible ? 'סגור דוח' : 'הצג דוח'}
                                                 </Button>
                                                 <div id="pdf-container" className="mt-4"></div>
-                                                💵 סכום התחלתי: {formatAmount(loansMan.amount, loansMan.currency)}<br />
-                                                📉 יתרה: {countAmountLeft(loansMan)}<br />
-                                                📆 סכום לחודש: {formatAmount(loansMan.amountInMonth, loansMan.currency) ?? 'לא זמין'}<br />
-                                                📅 יום בחודש: {loansMan.repaymentDay ?? 'לא צוין'}<br />
-                                                📊 כמות תשלומים: {formatAmount(loansMan.amountOfPament, loansMan.currency) ?? 'לא זמין'}<br />
+                                                {loanMap.repaymentType === "monthly" ? (
+                                                    <>
+                                                        💵 סכום התחלתי: {formatAmount(loanMap.amount, loanMap.currency)}<br />
+                                                        📆 סכום לחודש: {formatAmount(loanMap.amountInMonth, loanMap.currency) ?? 'לא זמין'}<br />
+                                                        📊 כמות תשלומים: {loanMap.amountOfPament ?? 'לא זמין'}<br />
+                                                        📅 יום בחודש: {loanMap.repaymentDay ?? 'לא צוין'}<br />
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        💵 סכום: {formatAmount(loanMap.amount, loanMap.currency)}<br />
+                                                        📅 תאריך החזר: {formatDateToReadable(loanMap.singleRepaymentDate) || "—"}<br />
+                                                    </>
+                                                )}
+                                                📉 יתרה: {countAmountLeft(loanMap)}<br />
+                                                תאריך התחלה: {formatDateToReadable(loanMap.startDate) || "—"}<br />
+                                                כמות איחורים: {loanMap.lateCount}<br />
                                                 <span style={{
                                                     color: 'white',
                                                     backgroundColor: getStatusColor(loansMan.status),
@@ -695,10 +707,14 @@ export default function Loans() {
                     ))}
                 </tbody>
             </Table>
-
+            <div className="d-flex justify-content-between">
+                <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                <span>דף {currentPage} מתוך {totalPages}</span>
+                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+            </div>
 
             <Modal show={showLoanModal} onHide={() => handleclose()} dir="rtl">
-                <Modal.Header closeButton>
+                <Modal.Header closeButton className="custom-header">
                     <Modal.Title>הוסף הלוואה חדשה</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>

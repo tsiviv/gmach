@@ -1,4 +1,5 @@
 const loadEncryptedEnv = require('./load-encrypted-env');
+const path = require('path');
 
 loadEncryptedEnv(() => {
     const express = require('express');
@@ -26,7 +27,7 @@ loadEncryptedEnv(() => {
         origin: ['http://localhost:3000'],
         credentials: true
     }));
-    app.use('/uploads', verifyToken, express.static('uploads'));
+    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
     app.use(express.urlencoded({ extended: true }));
     process.on('SIGINT', gracefulShutdown);
     process.on('SIGTERM', gracefulShutdown);

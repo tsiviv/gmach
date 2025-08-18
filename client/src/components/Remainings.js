@@ -12,6 +12,7 @@ export const MonthlyChecksNotification = () => {
             try {
                 const res = await getMonthlyChecks();
                 console.log(res)
+                console.log(res)
                 setChecks(res.checksThisMonth || []);
             } catch (err) {
                 if (err.response?.status === 403 || err.response?.status === 401) {

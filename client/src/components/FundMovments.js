@@ -23,6 +23,9 @@ export default function FundMovementsPage({ isAdmin }) {
     const [id, setid] = useState('')
     const navigate = useNavigate();
     const [MoneyInGmach, setMoneyInGmach] = useState(0)
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(50); // מספר רשומות לדף
     const [currentMovement, setCurrentMovement] = useState({
         amount: '',
         type: 'manual_adjustment',
@@ -51,6 +54,7 @@ export default function FundMovementsPage({ isAdmin }) {
             return movement.person?.fullName.toLowerCase().includes(filterValue.toLowerCase());
         }
 
+
         if (selectedFilter === 'dateRange') {
             if (!fromDate || !toDate) return true;
             return movement.date >= fromDate && movement.date <= toDate;
@@ -70,14 +74,14 @@ export default function FundMovementsPage({ isAdmin }) {
 
         return true;
     });
-    const handleShowPdf = async (personMovements) => {
+    const handleShowPdf = async (personMovements, person) => {
         const container = document.getElementById('pdf-container');
 
         if (pdfVisible) {
             container.innerHTML = '';
             setPdfVisible(false);
         } else {
-            const url = await generateMovmentReport(personMovements);
+            const url = await generateMovmentReport(personMovements, person);
             const iframe = document.createElement('iframe');
             iframe.src = url;
             iframe.width = '100%';
@@ -92,31 +96,28 @@ export default function FundMovementsPage({ isAdmin }) {
 
     useEffect(() => {
         loadMovements();
-    }, []);
-    // פונקציה לסיכום יתרת תנועות לפי מטבע עבור אדם מסוים
+    }, [currentPage]);
     const countPersonBalance = (personId) => {
-        const personMovements = movements.filter(m => m.personId === personId);
-        const balances = {};
+    const personMovements = movements.filter(m => m.personId === personId);
+    const balances = [];
 
-        personMovements.forEach(element => {
-            console.log(element)
-            const type = (element.type || '').toLowerCase().trim();
-            const amount = element.amount
-            const currency = element.currency
-            if (currency !== "dollar" && currency !== "shekel")
-                return
-            if (!balances[currency]) {
-                balances[currency] = 0;
-            }
-            if (['donation', 'deposit', 'repayment_received'].includes(type)) {
-                balances[currency] += amount;
-            } else {
-                balances[currency] -= amount;
-            }
-        });
-        console.log(balances, "balances")
-        return balances;
-    };
+    personMovements.forEach(element => {
+        const type = (element.type || '').toLowerCase().trim();
+        const amount = Number(element.amount) || 0;
+        const currency = (element.currency || 'shekel').toLowerCase().trim();
+
+        if (!balances[currency]) balances[currency] = 0;
+
+        if (['donation', 'deposit', 'repayment_received'].includes(type)) {
+            balances[currency] += amount;
+        } else {
+            balances[currency] -= amount;
+        }
+    });
+
+    return balances;
+};
+
 
     const handleAmountChange = (e) => {
         const rawValue = e.target.value.replace(/,/g, '');
@@ -137,9 +138,7 @@ export default function FundMovementsPage({ isAdmin }) {
             const type = (element.type || '').toLowerCase().trim();
             const amount = Number(element.amount) || 0;
             const currency = element.currency;
-            console.log(element.currency, "DSFR")
             if (currency !== 'shekel' && currency !== 'dollar') {
-                console.log(currency, "SWDF")
                 return;
             }
 
@@ -153,8 +152,6 @@ export default function FundMovementsPage({ isAdmin }) {
                 balances[currency] -= amount;
             }
         });
-
-        console.log(balances);
         setMoneyInGmach(balances);
     };
 
@@ -181,10 +178,10 @@ export default function FundMovementsPage({ isAdmin }) {
     }
     const loadMovements = async () => {
         try {
-            const data = await getAllMovements();
-            setMovements(data);
-            countMoneyInKopa(data)
-            console.log(data)
+            const data = await getAllMovements(currentPage, pageSize);
+            setMovements(data.data);
+            countMoneyInKopa(data.data)
+            setTotalPages(data.totalPages);
         }
         catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
@@ -192,6 +189,13 @@ export default function FundMovementsPage({ isAdmin }) {
             }
             console.log(err)
         }
+    };
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
     };
 
     const handleAddClick = () => {
@@ -223,7 +227,6 @@ export default function FundMovementsPage({ isAdmin }) {
     };
 
     const submitMovement = async (e) => {
-        console.log(currentMovement.type)
         e.preventDefault();
         try {
             if (isEdit) {
@@ -251,6 +254,16 @@ export default function FundMovementsPage({ isAdmin }) {
             console.error('שגיאה בשמירת תנועה:', err);
         }
     };
+
+    const getPerson = async (id) => {
+        try {
+            const person = await GetPersonById(id)
+            return person
+        }
+        catch (e) {
+
+        }
+    }
     const ShowPdf = async (currentMovement, person) => {
         const container = document.getElementById('pdf-container');
         if (pdfVisible) {
@@ -258,7 +271,6 @@ export default function FundMovementsPage({ isAdmin }) {
             setPdfVisible(false);
             return;
         }
-        console.log("dsafgf")
         const url = await generateDonationReport(currentMovement, person);
 
         const closeButton = document.createElement('button');
@@ -283,10 +295,8 @@ export default function FundMovementsPage({ isAdmin }) {
     };
 
     const handleIdBlur = async (id) => {
-        console.log("on")
         try {
             const existingPerson = await GetPersonById(id);
-            console.log(existingPerson)
             if (!existingPerson) {
                 setShowPersonModal(true);
             }
@@ -425,7 +435,6 @@ export default function FundMovementsPage({ isAdmin }) {
                             <>
                                 <span>                                              סך הכל תנועות לאדם:
                                     {Object.entries(countPersonBalance(filteredmovements[0].personId)).map(([currency, amount]) => {
-                                        console.log(currency, amount)
                                         const symbol = currency === 'shekel' ? '₪' : currency === 'dollar' ? '$' : currency;
                                         return (
                                             <span key={currency} style={{ marginLeft: '10px' }}>
@@ -434,7 +443,10 @@ export default function FundMovementsPage({ isAdmin }) {
                                         );
                                     })}
                                 </span>
-                                <Button onClick={() => handleShowPdf(filteredmovements)}>
+                                <Button onClick={async () => {
+                                    const person = await getPerson(filteredmovements[0].personId);
+                                    handleShowPdf(filteredmovements, person);
+                                }}>
                                     {pdfVisible ? 'סגור דוח' : 'הצג דוח PDF'}
                                 </Button>
                             </>
@@ -453,7 +465,6 @@ export default function FundMovementsPage({ isAdmin }) {
                         )
                     ) : (
                         <div dir="rtl" style={{ fontSize: '1.2em', fontWeight: 'bold', color: 'green' }}>
-                            {console.log(MoneyInGmach)}
                             {Object.entries(MoneyInGmach).map(([currency, amount]) => {
                                 const symbol = currency === 'shekel' ? '₪' : currency === 'dollar' ? '$' : currency;
                                 return (
@@ -501,9 +512,13 @@ export default function FundMovementsPage({ isAdmin }) {
                             ))}
                         </tbody>
                     </Table>}
-
+                <div className="d-flex justify-content-between">
+                    <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                    <span>דף {currentPage} מתוך {totalPages}</span>
+                    <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+                </div>
                 <Modal show={showModal} onHide={handleClose} dir="rtl">
-                    <Modal.Header closeButton>
+                    <Modal.Header closeButton className="custom-header">
                         <Modal.Title>{isEdit ? 'עריכת תנועה' : 'הוספת תנועה'}</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>

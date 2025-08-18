@@ -3,26 +3,43 @@ const Loan = require('../models/Loan');
 const { createFundMovement } = require('./fundMovementController')
 const FundMovement = require('../models/FundMovement');
 const People = require('../models/People');
-
+const LoanController = require('../controllers/LoanController');
 module.exports = {
     GetAllRepayments: async (req, res) => {
         try {
-            const repayments = await Repayment.findAll({
+            const page = parseInt(req.query.page) || 1; // דף נוכחי
+            const limit = parseInt(req.query.limit) || 20; // מספר הרשומות בדף
+            const offset = (page - 1) * limit;
+
+            const { count, rows } = await Repayment.findAndCountAll({
                 include: [
                     {
                         model: Loan,
-                        as: 'loan', include: [{
-                            model: People,
-                            as: 'borrower'
-                        }],
+                        as: 'loan',
+                        include: [
+                            {
+                                model: People,
+                                as: 'borrower'
+                            }
+                        ]
                     }
-                ]
+                ],
+                order: [['paidDate', 'DESC']], // או כל שדה אחר שאתה רוצה למיין לפי
+                offset,
+                limit
             });
-            res.json(repayments);
+
+            res.json({
+                data: rows,
+                total: count,
+                totalPages: Math.ceil(count / limit),
+                currentPage: page
+            });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     },
+
 
     GetRepaymentsByLoanId: async (req, res) => {
         try {
@@ -48,13 +65,11 @@ module.exports = {
     CreateRepayment: async (req, res) => {
         try {
             const { loanId, Guarantor, amount, paidDate, notes } = req.body;
-            await updateLoanStatus(loanId, Guarantor);
             const loan = await Loan.findByPk(loanId);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
             }
-            const repayment = await Repayment.create({ loanId, Guarantor, amount, paidDate, notes, typeOfPayment:loan.typeOfPayment, currency:loan.currency});
-            console.log(loan.typeOfPayment)
+            const repayment = await Repayment.create({ loanId, Guarantor, amount, paidDate, notes, typeOfPayment: loan.typeOfPayment, currency: loan.currency });
             await createFundMovement(
                 loan.borrowerId,
                 amount,
@@ -64,6 +79,7 @@ module.exports = {
                 `תשלום עבור הלוואה מספר #${loanId}`,
                 paidDate,
             );
+            await LoanController.updateLoanStatuses();
             res.status(201).json(repayment);
         } catch (err) {
             console.log(err)
@@ -92,11 +108,11 @@ module.exports = {
                 console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
             }
             await repayment.update({ loanId, Guarantor, amount, paidDate, notes, typeOfPayment, currency });
-            await updateLoanStatus(loanId, Guarantor);
             if (!loan) {
                 return res.status(404).json({ error: 'Loan not found' });
             }
             // צור תנועה כספית (חיוב החזר)
+            await LoanController.updateLoanStatuses();
 
             res.json(repayment);
         } catch (err) {
@@ -104,12 +120,28 @@ module.exports = {
         }
     },
 
-    // מחיקת רשומת פירעון
     DeleteRepayment: async (req, res) => {
         try {
             const { id } = req.params;
+            const repayment = await Repayment.findByPk(id);
             const deleted = await Repayment.destroy({ where: { id } });
+            const loan = await Loan.findByPk(repayment.loanId);
+            const existingMovement = await FundMovement.findOne({
+                where: {
+                    personId: loan.borrowerId,
+                    type: 'repayment_received',
+                    date: repayment.paidDate, // שים לב שהפורמט חייב להיות תואם ל-YYYY-MM-DD
+                    amount: repayment.amount
+                },
+            });
+
+            if (existingMovement) {
+                await existingMovement.destroy();
+            } else {
+                console.log('לא נמצאה תנועת קרן מתאימה לעדכון');
+            }
             if (!deleted) return res.status(404).json({ error: 'Repayment not found' });
+            await LoanController.updateLoanStatuses();
 
             res.json({ success: true });
         } catch (err) {
@@ -118,49 +150,4 @@ module.exports = {
     }
 
 };
-const updateLoanStatus = async (loanId, Guarantor) => {
-    const loan = await Loan.findByPk(loanId, {
-        include: [{ model: Repayment, as: 'repayments' }]
-    });
 
-    if (!loan) throw new Error('Loan not found');
-    const totalRepaid = loan.repayments.reduce((sum, r) => sum + r.amount, 0);
-    const dueAmount = loan.amount;
-    const now = new Date();
-    console.log("totalRepaid", totalRepaid)
-    let newStatus = 'pending';
-    console.log(loan.repaymentType)
-    if (Guarantor) {
-        newStatus = 'PaidBy_Gauartantor';
-    } else {
-        if (loan.repaymentType === 'once') {
-            console.log(loan.repaymentType)
-            const isLate = loan.singleRepaymentDate && totalRepaid < dueAmount && now > new Date(loan.singleRepaymentDate);
-            if (totalRepaid >= dueAmount) {
-                newStatus = isLate ? 'late_paid' : 'paid';
-            } else if (totalRepaid > 0) {
-                console.log("partial")
-                newStatus = 'partial';
-            } else {
-                newStatus = 'pending';
-            }
-        } else if (loan.repaymentType === 'monthly') {
-            console.log("monthly")
-            const monthsSinceStart = (now.getFullYear() - loan.startDate.getFullYear()) * 12 + (now.getMonth() - loan.startDate.getMonth()) + 1;
-            const expectedRepayments = monthsSinceStart;
-            const actualRepayments = loan.repayments.length;
-
-            if (totalRepaid >= dueAmount) {
-                newStatus = 'paid';
-            } else if (actualRepayments < expectedRepayments) {
-                newStatus = 'overdue';
-            } else {
-                console.log("partial")
-                newStatus = 'partial';
-            }
-        }
-    }
-
-    await loan.update({ status: newStatus });
-
-};

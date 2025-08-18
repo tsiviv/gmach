@@ -17,6 +17,7 @@ router.post('/', LoanController.CreateLoan);
 
 // פעולות לפי מזהה
 router.get('/:id', LoanController.GetLoanById);
+// router.get('/allLoansByPeopleId:id', LoanController.allLoansByPeopleId);
 router.put('/:id', LoanController.UpdateLoan);
 router.delete('/:id', LoanController.DeleteLoan);
 

@@ -14,7 +14,7 @@ import ModelNewPerson from "./ModelNewPerson";
 import { GetLoanStatusSummary } from '../servieces/Loans'
 import { GetPersonById, GetLoansByPerson } from '../servieces/People'
 import { useNavigate } from 'react-router-dom';
-import { formatAmount ,format} from './helper'
+import { formatAmount, format } from './helper'
 
 function Repayment() {
     const [repayments, setRepayments] = useState([]);
@@ -28,6 +28,7 @@ function Repayment() {
         notes: "",
         Guarantor: false
     });
+    const [error, setError] = useState('');
     const [Id, setId] = useState('')
     const [personId, setpersonId] = useState('')
     const [selectedFilter, setSelectedFilter] = useState('');
@@ -37,6 +38,11 @@ function Repayment() {
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
     const [loanguarantors, setloanguarantors] = useState([])
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [filterLoans, setFilterLoans] = useState([]);
+    const [SelectedLoan, setSelectedLoan] = useState()
+    const [pageSize] = useState(50); // מספר רשומות לדף
     const filteredRepayments = repayments.filter((repayment) => {
         if (!selectedFilter) return true;
 
@@ -64,22 +70,42 @@ function Repayment() {
 
         return true;
     });
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
+
     const handleAmountChange = (e) => {
-        const rawValue = e.target.value.replace(/,/g, ''); // הסרת פסיקים
-        if (!/^\d*$/.test(rawValue)) return; // חסום תווים לא מספריים
+        const rawValue = e.target.value.replace(/,/g, '');
+        if (!/^\d*$/.test(rawValue)) return;
 
         const numericValue = Number(rawValue);
+
+        const maxAmount = SelectedLoan ? Number(SelectedLoan.amount) : Infinity;
+
+        if (numericValue > maxAmount) {
+            setError(`הסכום לא יכול להיות גדול מסכום ההלוואה (${format(maxAmount)})`);
+            return;
+        }
+
+        setError('');
+
         const formattedValue = format(numericValue);
         setSelectedRepayment((prev) => ({
             ...prev,
             amount: formattedValue,
         }));
     };
+
     const fetchRepayments = async () => {
         try {
-            const res = await GetAllRepayments();
-            console.log(res)
-            setRepayments(res);
+            const res = await GetAllRepayments(currentPage, pageSize);
+            setTotalPages(res.totalPages)
+            setRepayments(res.data);
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../')
@@ -89,12 +115,10 @@ function Repayment() {
 
     useEffect(() => {
         fetchRepayments();
-    }, []);
+    }, [currentPage]);
     const handleIdBlur = async () => {
-        console.log("on")
         try {
             const existingPerson = await GetPersonById(personId);
-            console.log(existingPerson)
             if (!existingPerson) {
                 alert('לקוח לא קיים')
                 setpersonId('')
@@ -102,15 +126,19 @@ function Repayment() {
             }
             else {
                 const res2 = await GetLoansByPerson(personId)
-                const loan = res2.find((loan) => loan.status == 'pending' || loan.status == 'partial' || loan.status == 'overdue' || loan.status == 'late_paid')
-                setloanguarantors(loan.guarantors)
-                console.log(loan)
-                if (!loan) {
+                const loans = res2.filter((loan) => loan.status == 'pending' || loan.status == 'partial' || loan.status == 'overdue')
+                if (loans.length == 1) {
+                    setloanguarantors(loans[0].guarantors)
+                    setSelectedRepayment({ ...selectedRepayment, loanId: loans[0].id })
+                    setSelectedLoan(loans[0])
+                }
+                else if (loans.length == 0) {
                     alert("ללקוח זה אין הלוואה פעילה")
                     setpersonId('')
                     return
                 }
-                setSelectedRepayment({ ...selectedRepayment, loanId: loan.id })
+                else
+                    setFilterLoans(loans)
             }
 
 
@@ -120,6 +148,9 @@ function Repayment() {
                 navigate('../')
             }
         }
+    }
+    const chooseLoan = () => {
+
     }
     const handleShowModal = (repayment = null) => {
         if (repayment) {
@@ -155,6 +186,17 @@ function Repayment() {
         return statusMap[repaymentType] || 'לא ידוע';
     }
     const handleSave = async () => {
+        if (!selectedRepayment.loanId) {
+            setError('אנא בחר הלוואה לפני השליחה');
+            return;
+        }
+        const maxAmount = SelectedLoan ? Number(SelectedLoan.amount) : Infinity;
+        if (Number(selectedRepayment.amount.replace(/,/g, '')) > maxAmount) {
+            setError(`הסכום לא יכול להיות גדול מסכום ההלוואה (${format(maxAmount)})`);
+            return;
+        }
+
+        setError('');
         try {
             if (isEdit) {
                 await UpdateRepayment(Id, selectedRepayment.loanId, selectedRepayment.Guarantor, selectedRepayment.amount.replace(/,/g, ''), selectedRepayment.paidDate, selectedRepayment.notes);
@@ -305,11 +347,11 @@ function Repayment() {
                             <td>{index + 1}</td>
                             <td>{repayment.loan.borrowerId}</td>
                             <td>{repayment.loan.borrower.fullName} </td>
-                            <td>{formatAmount(repayment.amount,repayment.currency)}</td>
+                            <td>{formatAmount(repayment.amount, repayment.currency)}</td>
                             <td>{new Date(repayment.paidDate).toLocaleDateString()}</td>
                             <td>{repayment.loan?.amount || '-'}</td>
                             <td>{translaterepaymentType(repayment.loan?.repaymentType) || '-'}</td>
-                            <td>{repayment.loan?.amountInMonth == "null" ? '-' : formatAmount(repayment.loan?.amountInMonth,repayment.currency)}</td>
+                            <td>{repayment.loan?.amountInMonth == "null" ? '-' : formatAmount(repayment.loan?.amountInMonth, repayment.currency)}</td>
                             <td>{repayment.loan?.startDate ? new Date(repayment.loan.startDate).toLocaleDateString() : '-'}</td>
                             <td>
                                 <FaEdit
@@ -328,12 +370,19 @@ function Repayment() {
                 </tbody>
 
             </Table>
-
+            <div className="d-flex justify-content-between">
+                <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
+                <span>דף {currentPage} מתוך {totalPages}</span>
+                <Button onClick={handleNextPage} disabled={currentPage === totalPages}>הבא ⟶</Button>
+            </div>
             <Modal show={showModal} onHide={handleCloseModal}>
-                <Modal.Header closeButton>
-                    <Modal.Title>{isEdit ? 'עריכת תשלום' : 'הוספת תשלום חדש'}</Modal.Title>
+                <Modal.Header closeButton className="custom-header">
+                    <Modal.Title className="ms-auto">
+                        {isEdit ? 'עריכת תשלום' : 'הוספת תשלום חדש'}
+                    </Modal.Title>
                 </Modal.Header>
-                <Modal.Body>
+
+                <Modal.Body dir="rtl">
                     <Form>
                         <Form.Group className="mb-3">
                             <Form.Label>תעודת זהות</Form.Label>
@@ -344,17 +393,47 @@ function Repayment() {
                                 onBlur={() => handleIdBlur()}
                             />
                         </Form.Group>
+                        {filterLoans.length > 0 && (
+                            <Form.Group className="mb-3">
+                                <Form.Label>בחר הלוואה</Form.Label>
+                                <Form.Select
+                                    value={selectedRepayment.loanId}
+                                    onChange={(e) => {
+                                        const selectedLoan = filterLoans.find(loan => loan.id === Number(e.target.value));
+                                        if (selectedLoan) {
+                                            setloanguarantors(selectedLoan.guarantors);
+                                            setSelectedRepayment({
+                                                ...selectedRepayment,
+                                                loanId: selectedLoan.id
+                                            });
+                                            setSelectedLoan(selectedLoan)
+                                        }
+                                    }}
+                                    required
+                                >
+                                    <option value="">-- בחר הלוואה --</option>
+                                    {filterLoans.map((loan) => (
+                                        <option key={loan.id} value={loan.id}>
+                                            הלוואה #{loan.numOfLoan} - {new Date(loan.startDate).toLocaleDateString('he-IL')}
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                                {error && <div style={{ color: 'red', marginTop: '5px' }}>{error}</div>}
+                            </Form.Group>
+                        )}
+
                         <Form.Group className="mb-3">
-                            <Form.Label>משולם על ידי </Form.Label>
+                            <Form.Label>משולם על ידי</Form.Label>
                             <Form.Select
                                 name="Guarantor"
                                 value={selectedRepayment.Guarantor}
                                 onChange={(e) => setSelectedRepayment({ ...selectedRepayment, Guarantor: e.target.value })}
                             >
-                                <option value={false} >הלווה</option>
+                                <option value={false}>הלווה</option>
                                 {loanguarantors.length > 0 && <option value={true}>ערב</option>}
                             </Form.Select>
                         </Form.Group>
+
                         <Form.Group className="mb-2">
                             <Form.Label>סכום</Form.Label>
                             <Form.Control
@@ -365,8 +444,9 @@ function Repayment() {
                                 required
                             />
                         </Form.Group>
+
                         <Form.Group className="mb-3">
-                            <Form.Label>תאריך </Form.Label>
+                            <Form.Label>תאריך</Form.Label>
                             <Form.Control
                                 type="date"
                                 name="paidDate"
@@ -379,6 +459,7 @@ function Repayment() {
                                 required
                             />
                         </Form.Group>
+
                         <Form.Group className="mb-3">
                             <Form.Label>הערות</Form.Label>
                             <Form.Control
@@ -387,10 +468,9 @@ function Repayment() {
                                 onChange={(e) => setSelectedRepayment({ ...selectedRepayment, notes: e.target.value })}
                             />
                         </Form.Group>
-
                     </Form>
                 </Modal.Body>
-                <Modal.Footer>
+                <Modal.Footer dir="rtl">
                     <Button variant="secondary" onClick={handleCloseModal}>ביטול</Button>
                     <Button variant="primary" onClick={handleSave}>שמור</Button>
                 </Modal.Footer>
