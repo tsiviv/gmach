@@ -4,30 +4,18 @@ const path = require('path');
 const multer = require('multer');
 const sharp = require('sharp');
 
-let DATA_PATH = null;  // נקבע ב-setUserDataPath
-let uploadPath = null;
-let expressAppInstance = null;
+// קביעת תיקיות סטנדרטיות בפרויקט
+const BASE_PATH = path.join(__dirname, '..', 'data'); // תיקיית data בפרויקט
+const UPLOAD_PATH = path.join(BASE_PATH, 'uploads');
+const DATA_PATH = path.join(BASE_PATH, 'settings.json');
 
-// מאפשר קבלת הנתיב + האפליקציה מבחוץ
-function setUserDataPath(userDataPath, expressApp) {
-  expressAppInstance = expressApp;
-
-  // הגדרת נתיבים דינמית תחת userData
-  uploadPath = path.join(userDataPath, 'uploads');
-  DATA_PATH = path.join(userDataPath, 'settings.json');
-
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
-  }
-
-  // יצירת settings.json ריק אם אין עדיין
-  if (!fs.existsSync(DATA_PATH)) {
-    fs.writeFileSync(DATA_PATH, JSON.stringify({}, null, 2), 'utf8');
-  }
-}
+// יצירת תיקיות אם לא קיימות
+if (!fs.existsSync(BASE_PATH)) fs.mkdirSync(BASE_PATH, { recursive: true });
+if (!fs.existsSync(UPLOAD_PATH)) fs.mkdirSync(UPLOAD_PATH, { recursive: true });
+if (!fs.existsSync(DATA_PATH)) fs.writeFileSync(DATA_PATH, JSON.stringify({}, null, 2), 'utf8');
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadPath),
+  destination: (req, file, cb) => cb(null, UPLOAD_PATH),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
@@ -47,15 +35,13 @@ const readConfig = () => {
 };
 
 const writeConfig = (config) => {
-  if (expressAppInstance) {
-    config.userDataPath = uploadPath.replace(/[/\\]uploads$/, '');
-  }
+  // שמירת הנתיב היחסי של uploads
+  config.userDataPath = path.resolve(BASE_PATH);
   fs.writeFileSync(DATA_PATH, JSON.stringify(config, null, 2), 'utf8');
 };
 
 module.exports = {
-  setUserDataPath,
-readConfig,
+  readConfig,
   login: async (req, res) => {
     const { email, password } = req.body;
     const validEmail = process.env.ENAIL_ADMIN;
@@ -83,7 +69,7 @@ readConfig,
     try {
       if (!req.file) return res.status(400).json({ message: 'לא הועלה קובץ' });
 
-      const logoFilePath = path.join(uploadPath, 'logo.png');
+      const logoFilePath = path.join(UPLOAD_PATH, 'logo.png');
       if (fs.existsSync(logoFilePath)) fs.unlinkSync(logoFilePath);
 
       await sharp(req.file.path).png().toFile(logoFilePath);
@@ -107,16 +93,14 @@ readConfig,
     writeConfig(config);
     res.json({ message: 'השם נשמר בהצלחה', config });
   },
+
   toggleNotifications: async (req, res) => {
-  const config = readConfig();
-
-  config.wantsNotifications = !config.wantsNotifications;
-
-  writeConfig(config);
-  res.json({
-    message: `wantsNotifications עודכן ל-${config.wantsNotifications}`,
-    config
-  });
-},
-
+    const config = readConfig();
+    config.wantsNotifications = !config.wantsNotifications;
+    writeConfig(config);
+    res.json({
+      message: `wantsNotifications עודכן ל-${config.wantsNotifications}`,
+      config
+    });
+  },
 };

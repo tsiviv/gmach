@@ -8,6 +8,7 @@ import { GetLoansByGuarantor, CreatePerson, DeletePerson, GetLoansByPerson, GetA
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import ModelNewPerson from './ModelNewPerson';
 import { getCurrentBalance, getDepositsByPersonId } from '../servieces/Deposit';
+import { getCurrentBalance, getDepositsByPersonId } from '../servieces/Deposit';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { formatAmount } from './helper'
 import { generatePersonReport } from './GenerateReport';
@@ -153,6 +154,7 @@ const openModal = (path) => {
             const res = await GetLoansByPerson(id);
             const res2 = await getCurrentBalance(id);
             setdep(res2)
+            setdeposit(res2);
             setdeposit(res2);
             setloans(res);
             setOpenLoanId(openLoanId === res[0].id ? null : res[0].id)
@@ -383,6 +385,7 @@ const openModal = (path) => {
 
                                                     </div>
 
+
                                                     {showRepayments[loan.id] && loan.repayments.length && (
                                                         <div className="mt-2">
                                                             <Table striped bordered size="sm">
@@ -410,7 +413,43 @@ const openModal = (path) => {
                                                 </li>
                                             ))}
 
+
                                         </ul>
+                                        {deposit && (
+                                            <div className="mt-3">
+                                                <Button
+                                                    variant="outline-success"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setShowDeposits(prev => ({ ...prev, [p.id]: !prev[p.id] }))
+                                                    }
+                                                >
+                                                    {showDeposits[p.id] ? 'הסתר הפקדות' : 'הצג הפקדות'}
+                                                </Button>
+
+                                                {showDeposits[p.id] && (
+                                                    <Table striped bordered size="sm" className="mt-2">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>סוג הפקדה</th>
+                                                                <th>סכום</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td>יתרת הפקדות בשקלים</td>
+                                                                <td>{formatAmount(deposit.balanceShekel, "shekel")}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td>יתרת הפקדות בדולרים</td>
+                                                                <td>{formatAmount(deposit.balanceDollar, "dollar")}</td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </Table>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {deposit && (
                                             <div className="mt-3">
                                                 <Button

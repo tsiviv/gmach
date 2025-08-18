@@ -4,6 +4,7 @@ import { GetOverdueLoans, getMonthlyChecks } from '../servieces/Loans';
 import { useNavigate } from 'react-router-dom';
 import { sendEmail } from '../servieces/Loans';
 import { formatAmount } from './helper';
+import { formatAmount } from './helper';
 
 export const Notification = () => {
     const [enabled, setEnabled] = useState(false);
@@ -120,6 +121,7 @@ export const Notification = () => {
                             <p>לווה: {loan.borrower?.fullName}</p>
                             <p>טלפון: {loan.borrower?.phone}</p>
                             <p>סכום הלוואה: ₪{loan.amount.toLocaleString()}</p>
+                            <p> יתרה: {formatAmount(countAmountLeft(loan), loan.currency)}</p>
                             <p> יתרה: {formatAmount(countAmountLeft(loan), loan.currency)}</p>
                             <p>תאריך התחלה: {new Date(loan.startDate).toLocaleDateString()}</p>
                             <p> סוג החזר: {translaterepaymentType(loan.repaymentType)}</p>
