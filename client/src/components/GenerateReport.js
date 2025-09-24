@@ -1,13 +1,15 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fontBase64 from './embedded_font_example';
-import { formatAmountPdf, format, convertToHebrewDate } from './helper';
+import { formatAmountPdf, convertToHebrewDate } from './helper';
 
-const title = sessionStorage.getItem('siteTitle')
+
+
+const title = localStorage.getItem('siteTitle') || '---';
+const token = localStorage.getItem('token') || '';
 const RLE = '\u202B';
 const LRM = "\u200E";
 const PDF = '\u202C';
-const token = sessionStorage.getItem('token');
 
 function reverseText(text) {
     const isEnglish = /^[\u0000-\u007F\s.,!?'"()\[\]{}\-:/\\@#$%^&*+=<>|~`]*$/.test(text);
@@ -29,21 +31,16 @@ function translateLoanStatus(status) {
         late_paid: 'שולמה באיחור',
         PaidBy_Gauartantor: 'שולמה על ידי ערב',
     };
-
     return statusMap[status] || 'לא ידוע';
 }
 
 export const generatePersonReport = (person, loans, deposit = []) => {
     const logo = new Image();
-    logo.src = `http://localhost:4000/uploads/logo.png?token=${token}`;
+    logo.src = 'http://localhost:4000/uploads/logo.png';
 
     return new Promise((resolve) => {
         const createDoc = (withLogo) => {
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
             doc.addFileToVFS('OpenSansHebrew-Regular.ttf', fontBase64);
             doc.addFont('OpenSansHebrew-Regular.ttf', 'OpenSansHebrew', 'normal');
@@ -61,12 +58,7 @@ export const generatePersonReport = (person, loans, deposit = []) => {
                 const ratio = logo.width / logo.height;
                 let width = maxWidth;
                 let height = maxWidth / ratio;
-
-                if (height > maxHeight) {
-                    height = maxHeight;
-                    width = maxHeight * ratio;
-                }
-
+                if (height > maxHeight) { height = maxHeight; width = maxHeight * ratio; }
                 doc.addImage(logo, 'PNG', 10, 15, width, height);
             }
 
@@ -79,11 +71,11 @@ export const generatePersonReport = (person, loans, deposit = []) => {
             doc.text(`${LRM}${person.phone} :טלפון`, 200, 56, alignRight);
             doc.text(`${reverseText(person.address || '-')} ${reverseText('כתובת:')}`, 200, 64, alignRight);
             doc.text(`${LRM}${person.email || '-'} :אימייל`, 200, 72, alignRight);
-            doc.text(reverseText('הערות:', person.notes), 200, 80, alignRight);
+            doc.text(reverseText('הערות:'), 200, 80, alignRight);
+            doc.text(reverseText(person.notes || '-'), 200, 88, alignRight);
 
             let currentY = 90;
 
-            // ----- הפקדות -----
             if (deposit.length > 0) {
                 doc.setFontSize(14);
                 doc.text(reverseText('רשימת פעולות כספיות:'), 200, currentY, alignRight);
@@ -112,11 +104,9 @@ export const generatePersonReport = (person, loans, deposit = []) => {
                     ])
                 });
 
-                // עדכון Y אחרי הטבלה
                 currentY = doc.lastAutoTable.finalY + 10;
             }
 
-            // ----- הלוואות -----
             if (loans.length > 0) {
                 doc.setFontSize(14);
                 doc.text(reverseText('הלוואות ותשלומים'), 200, currentY, alignRight);
@@ -127,10 +117,10 @@ export const generatePersonReport = (person, loans, deposit = []) => {
                     const balance = loan.amount - totalPaid;
 
                     doc.setFontSize(12);
-
                     doc.text(`#${loan.id} ${reverseText('הלוואה')}`, 200, currentY, alignRight);
                     doc.text(reverseText(`סכום התחלתי: ${formatAmountPdf(loan.amount, loan.currency)}`), 200, currentY + 8, alignRight);
                     doc.text(reverseText(`יתרה: ${formatAmountPdf(balance, loan.currency)}`), 200, currentY + 16, alignRight);
+
                     if (loan.repaymentType === 'monthly') {
                         doc.text(reverseText(`סכום לחודש: ${formatAmountPdf(loan.amountInMonth, loan.currency)}`), 200, currentY + 24, alignRight);
                         doc.text(reverseText(`מספר תשלומים: ${loan.amountOfPament}`), 200, currentY + 32, alignRight);
@@ -156,17 +146,13 @@ export const generatePersonReport = (person, loans, deposit = []) => {
                             body: loan.repayments.map(r => [
                                 new Date(r.paidDate).toLocaleDateString('he-IL'),
                                 reverseText(convertToHebrewDate(new Date(r.paidDate))),
-                                `${reverseText(formatAmountPdf(r.amount, loan.currency))}`,
+                                reverseText(formatAmountPdf(r.amount, loan.currency)),
                                 reverseText(r.typeOfPayment === 'check' ? 'צ׳ק' : 'הוראת קבע'),
                                 reverseText(r.notes || '-')
                             ])
                         });
-
-                        // עדכון Y אחרי טבלת התשלומים
                         currentY = doc.lastAutoTable.finalY + 10;
-                    } else {
-                        currentY += 10;
-                    }
+                    } else { currentY += 10; }
                 });
             }
 
@@ -179,12 +165,10 @@ export const generatePersonReport = (person, loans, deposit = []) => {
     });
 };
 
-
-
-export const generateLoanReport = (loan) => {
+export const generateLoanReport = async (loan) => {
     return new Promise((resolve) => {
         const logo = new Image();
-        logo.src = `http://localhost:4000/uploads/logo.png?token=${token}`;
+        logo.src = 'http://localhost:4000/uploads/logo.png';
 
         const createDoc = (withLogo) => {
             const doc = new jsPDF({
@@ -286,7 +270,7 @@ export const generateLoanReport = (loan) => {
 export const generateMovmentReport = (movment = [], person) => {
     return new Promise((resolve) => {
         const logo = new Image();
-        logo.src = `http://localhost:4000/uploads/logo.png?token=${token}`;
+        logo.src = 'http://localhost:4000/uploads/logo.png';
 
         const createDoc = (withLogo) => {
             const doc = new jsPDF({
@@ -365,7 +349,6 @@ export const generateMovmentReport = (movment = [], person) => {
     });
 };
 
-
 function translateMovmemntType(MovmemntType) {
     console.log(MovmemntType)
     const statusMap = {
@@ -383,7 +366,7 @@ function translateMovmemntType(MovmemntType) {
 export const generateDepositReport = (deposit, person, balancePresonShekel, balancePresonDollar, history = []) => {
     console.log(deposit, history)
     const logo = new Image();
-    logo.src = `http://localhost:4000/uploads/logo.png?token=${token}`;
+        logo.src = 'http://localhost:4000/uploads/logo.png';
 
     return new Promise((resolve) => {
         const createDoc = (withLogo = false) => {
@@ -478,12 +461,10 @@ export const generateDepositReport = (deposit, person, balancePresonShekel, bala
     });
 };
 
-
-
 export const generateDonationReport = (movement, person) => {
     return new Promise((resolve) => {
         const logo = new Image();
-        logo.src = `http://localhost:4000/uploads/logo.png?token=${token}`;
+        logo.src = 'http://localhost:4000/uploads/logo.png';
 
         const createDoc = (withLogo = false) => {
             const doc = new jsPDF({

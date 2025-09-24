@@ -1,21 +1,34 @@
-import axios from 'axios'
+import axios from 'axios';
 
-const url = 'http://localhost:4000'
+const api = axios.create({
+  baseURL: 'http://localhost:4000',
+});
+
+// מוסיף את הטוקן לכל בקשה
+api.interceptors.request.use(
+  (config) => {
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export const LoginAdmin = async (email, password) => {
   try {
-    const res = await axios.post(`${url}/Login`, { email, password })
-    return res.data
+    const res = await axios.post(`${api.defaults.baseURL}/Login`, { email, password });
+    return res.data;
   } catch (error) {
-    console.error('Error fetching all loans:', error)
-    console.log("f")
-    throw error
+    console.error('Error fetching all loans:', error);
+    throw error;
   }
-}
+};
 
 export const getSiteDetails = async () => {
   try {
-    const res = await axios.get(`${url}/Login/settings`)
+    const res = await axios.get(`${api.defaults.baseURL}/Login/settings`)
     return res.data
   } catch (error) {
     console.error('שגיאה בקבלת פרטי האתר:', error)
@@ -23,40 +36,36 @@ export const getSiteDetails = async () => {
   }
 }
 
-
-export const uploadLogo = async (file, siteTitle) => {
+export const uploadLogo = async (file) => {
   try {
-    const formData = new FormData()
-    formData.append('logo', file)
-    formData.append('name', siteTitle)
+    if (!file) throw new Error("לא נבחר קובץ לוגו");
 
-    const res = await axios.post(`${url}/Login/upload-logo`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const formData = new FormData();
+    formData.append('logo', file);
 
-    return res.data
+    const res = await api.post('/Login/upload-logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+    return res.data;
   } catch (error) {
-    console.error('שגיאה בהעלאת לוגו:', error)
-    throw error
+    console.error('שגיאה בהעלאת לוגו:', error);
+    throw error;
   }
-}
+};
 
 export const updateSiteTitle = async (siteTitle) => {
   try {
-    const params = new URLSearchParams()
-    params.append('name', siteTitle)
+    const params = new URLSearchParams();
+    params.append('name', siteTitle);
 
-    const res = await axios.post(`${url}/Login/update-name`, params, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    })
+    const res = await api.post('/Login/update-name', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
 
-    return res.data
+    return res.data;
   } catch (error) {
-    console.error('שגיאה בעדכון השם:', error)
-    throw error
+    console.error('שגיאה בעדכון השם:', error);
+    throw error;
   }
-}
+};

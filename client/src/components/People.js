@@ -39,6 +39,8 @@ function People() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(50); // מספר רשומות לדף
+     const [showModal, setShowModal] = useState(false);
+    const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
     const filteredpeople = people.filter((person) => {
         if (!selectedFilter) return true;
         if (selectedFilter === 'borrowerId') return person.id.toString().includes(filterValue);
@@ -96,6 +98,11 @@ function People() {
         };
         fetch();
     }, [showPersonModal, render, currentPage]);
+
+const openModal = (path) => {
+        setSelectedPdfUrl(`http://localhost:4000/uploads/${path}?token=${token}`);
+        setShowModal(true);
+    };
 
     const countAmountLeft = (loan) => {
         let total = loan.amount
@@ -287,10 +294,10 @@ function People() {
                                                     📊 כמות תשלומים: {loan.amountOfPament ?? 'לא זמין'}<br />
                                                     כמות איחורים להלוואה זו: {loan.lateCount}<br />
                                                     {loan.documentPath ? <div>
-                                                        <Button variant="dark"
-                                                            onClick={() => setShowDocumentModal(true)}>שטר חוב </Button>
-                                                        <DocumentModal show={showDocumentModal} onClose={() => setShowDocumentModal(false)} pdfUrl={`http://localhost:4000/${loan.documentPath}?token=${token}`} />
-                                                    </div> : '-'}
+                                        <Button variant="dark" onClick={() => openModal(loan.documentPath)}>
+                                            שטר חוב
+                                        </Button>
+                                    </div> : '-'}
                                                     <span style={{
                                                         color: 'white',
                                                         backgroundColor: getStatusColor(loan.status),
@@ -311,12 +318,14 @@ function People() {
                                                                 <li key={idx}>
                                                                     שם ערב: {g.guarantor?.fullName || "לא זמין"}
                                                                     {g.documentPath && (
-                                                                        <>
-                                                                            {" - "}
-                                                                            <DocumentModal show={showDocumentModal} onClose={() => setShowDocumentModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
-                                                                            <Button className="btn btn-dark" onClick={() => setShowDocumentModal(true)}> שטר חוב ערב</Button>
-                                                                        </>
-                                                                    )}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="secondary"
+                                                                        onClick={() => openModal(g.documentPath)}
+                                                                    >
+                                                                        מסמך ערב
+                                                                    </Button>
+                                                                )}
                                                                 </li>
                                                             ))}
                                                         </ul>
@@ -416,6 +425,13 @@ function People() {
                     ))}
                 </tbody>
             </Table>
+            {selectedPdfUrl && (
+                            <DocumentModal
+                                show={showModal}
+                                onClose={() => setShowModal(false)}
+                                pdfUrl={selectedPdfUrl}
+                            />
+                        )}
             <div className="d-flex justify-content-between">
                 <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
                 <span>דף {currentPage} מתוך {totalPages}</span>

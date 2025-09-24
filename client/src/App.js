@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom'; // <-- שינוי כאן
 import Login from './components/Login';
 import People from './components/People';
 import Loans from './components/Loans';
@@ -9,15 +9,13 @@ import Header from './components/Header';
 import Sidebar from './components/Siderbar';
 import { Explaination } from './components/Explaination';
 import Deposit from './components/Deposit';
-import './App.css'; // אם שמת את הסגנון כאן
+import './App.css';
 import './styles/colors.css';
 import { Notification } from './components/Notification';
 import Turns from './components/Turns';
 import { MonthlyChecksNotification } from './components/Remainings';
-import { useEffect } from 'react';
 
 function App() {
-
   return (
     <Router>
       <div className="layout" dir="rtl">

@@ -1,26 +1,21 @@
-const Login = require('../controllers/Login');
 const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const path = require('path');
+const Login = require('../controllers/Login');
+const { app: electronApp } = require('electron');
+const { verifyToken } = require('../middleware/auth');
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, '../uploads'));
-    },
-    filename: function (req, file, cb) {
-        cb(null, 'logo.png');
-    }
-});
+module.exports = (expressApp, userDataPath) => {
+  const router = express.Router();
 
-router.post('/', Login.login);
+  const resolvedUserDataPath = userDataPath || electronApp.getPath('userData');
 
-const upload = multer({ storage: storage });
+  if (Login.setUserDataPath) {
+    Login.setUserDataPath(resolvedUserDataPath, expressApp);
+  }
 
-router.post('/upload-logo', upload.single('logo'), Login.uploadLogo);
+  router.post('/', Login.login);
+  router.post('/upload-logo', verifyToken, Login.uploadLogo);
+  router.post('/update-name', verifyToken, Login.updateName);
+  router.get('/settings', Login.getSettings);
 
-router.post('/update-name', Login.updateName);
-
-router.get('/settings', Login.getSettings);
-
-module.exports = router;
+  return router;
+};

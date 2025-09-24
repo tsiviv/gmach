@@ -29,6 +29,7 @@ export default function Loans() {
         documentPath: null,
         guarantors: []
     });
+      const [formKey, setFormKey] = useState(Date.now()); // 👈 מפתח לטופס
     const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL');
     const token = sessionStorage.getItem('token');
     const navigate = useNavigate();
@@ -39,6 +40,7 @@ export default function Loans() {
     const [error, setError] = useState("");
     const [showLoanModal, setShowLoanModal] = useState(false); // שליטה על מודל ההלוואה
     const [openRowId, setOpenRowId] = useState(null);
+    const [selectedPdfUrl, setSelectedPdfUrl] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [selectedFilter, setSelectedFilter] = useState('');
     const [filterValue, setFilterValue] = useState('');
@@ -155,22 +157,23 @@ export default function Loans() {
         }
         setOpenRowId(openRowId === id ? null : id)
     };
-    useEffect(() => {
-        async function fetchData() {
-            try {
-                const allLoans = await GetAllLoans(currentPage, pageSize);
-                setLoans(allLoans.data);
-                setTotalPages(allLoans.totalPages);
-                console.log(allLoans)
-            } catch (err) {
-                if (err.response?.status === 403 || err.response?.status === 401) {
-                    navigate('../')
-                } setError("שגיאה בטעינת נתונים");
-            }
-        }
 
+    async function fetchData() {
+        try {
+            const allLoans = await GetAllLoans(currentPage, pageSize);
+            setLoans(allLoans.data);
+            setTotalPages(allLoans.totalPages);
+            console.log(allLoans)
+        } catch (err) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                navigate('../')
+            } setError("שגיאה בטעינת נתונים");
+        }
+    }
+
+    useEffect(() => {
         fetchData();
-    }, [showLoanModal, render, currentPage]);
+    }, [ , currentPage]);
 
     const handleLoanChange = (e) => {
         const { name, value } = e.target;
@@ -199,7 +202,6 @@ export default function Loans() {
                     issues.push(`משתמש זה משמש כערב ב-${res.guarantorCount} הלוואות.`);
                 }
                 if (res.borrower.overdue.length > 0) {
-                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
                     issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
                 }
 
@@ -241,7 +243,6 @@ export default function Loans() {
                 }
 
                 if (res.borrower.overdue.length > 0) {
-                    setNewLoan({ ...newLoan, ['borrowerId']: '' });
                     issues.push('למשתמש זה יש הלוואה שפג תוקפה ולא שולמה או שולמה חלקית(איחור חריג).');
                 }
 
@@ -348,7 +349,7 @@ export default function Loans() {
             if (!confirmDelete) return;
 
             const res = await DeleteLoan(id);
-            setrender(!render)
+            fetchData()
             setError('');
         } catch (err) {
             setError(err.response?.data || 'שגיאה לא צפויה');
@@ -392,8 +393,10 @@ export default function Loans() {
     }
 
     const handleclose = () => {
+        setFormKey(Date.now());
         setShowLoanModal(false)
         setisEdit(false)
+        fetchData()
     }
     const translateMethod = (method) => {
         switch (method) {
@@ -412,8 +415,8 @@ export default function Loans() {
     };
 
     const openShowLoanModal = () => {
-        setShowLoanModal(true)
-        setisEdit(false)
+        setFormKey(Date.now());
+        setisEdit(false);
         setNewLoan({
             numOfLoan: '',
             borrowerId: '',
@@ -429,15 +432,20 @@ export default function Loans() {
             notes: '',
             documentPath: null,
             guarantors: []
-        })
-    }
+        });
+        setShowLoanModal(true); // פותח אחרי שה-state עודכן
+    };
 
+    const openModal = (path) => {
+        setSelectedPdfUrl(`http://localhost:4000/uploads/${path}?token=${token}`);
+        setShowModal(true);
+    };
     return (
         <div className="container pt-5">
             <div className="d-flex justify-content-start mb-3">
                 <Button variant="warning"
                     className="mb-3 ms-5" onClick={() => openShowLoanModal()}>הוסף הלוואה</Button>
-                <Form className="mb-3">
+                <Form className="mb-3 ">
                     <div className="row align-items-end">
                         <div className="col">
                             <Form.Label>בחר שדה לסינון:</Form.Label>
@@ -593,9 +601,9 @@ export default function Loans() {
 
                                 <td>
                                     {loanMap.documentPath ? <div>
-                                        <Button variant="dark"
-                                            onClick={() => setShowModal(true)}>שטר חוב </Button>
-                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${loanMap.documentPath}?token=${token}`} />
+                                        <Button variant="dark" onClick={() => openModal(loanMap.documentPath)}>
+                                            שטר חוב
+                                        </Button>
                                     </div> : '-'}
                                 </td>
                                 <td>
@@ -659,11 +667,13 @@ export default function Loans() {
                                                             <li key={idx}>
                                                                 שם ערב: {g.guarantor?.fullName || "לא זמין"}
                                                                 {g.documentPath && (
-                                                                    <>
-                                                                        {" - "}
-                                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
-                                                                        <Button className="btn btn-dark" onClick={() => setShowModal(true)}> שטר חוב ערב</Button>
-                                                                    </>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="secondary"
+                                                                        onClick={() => openModal(g.documentPath)}
+                                                                    >
+                                                                        מסמך ערב
+                                                                    </Button>
                                                                 )}
                                                             </li>
                                                         ))}
@@ -707,6 +717,13 @@ export default function Loans() {
                     ))}
                 </tbody>
             </Table>
+            {selectedPdfUrl && (
+                <DocumentModal
+                    show={showModal}
+                    onClose={() => setShowModal(false)}
+                    pdfUrl={selectedPdfUrl}
+                />
+            )}
             <div className="d-flex justify-content-between">
                 <Button onClick={handlePrevPage} disabled={currentPage === 1}>⟵ קודם</Button>
                 <span>דף {currentPage} מתוך {totalPages}</span>
@@ -718,13 +735,13 @@ export default function Loans() {
                     <Modal.Title>הוסף הלוואה חדשה</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Form onSubmit={handleSubmit}>
+                    <Form key={formKey} onSubmit={handleSubmit }>
                         <Form.Group className="mb-3">
                             <Form.Label> מספר הלוואה</Form.Label>
                             <Form.Control
                                 type="text"
                                 name="numOfLoan"
-                                value={newLoan.numOfLoan}
+                                value={newLoan.numOfLoan ?? ""}
                                 onChange={handleLoanChange}
                                 required
                             />
@@ -734,7 +751,7 @@ export default function Loans() {
                             <Form.Control
                                 type="text"
                                 name="borrowerId"
-                                value={newLoan.borrowerId}
+                                value={newLoan.borrowerId ?? ""}
                                 onChange={handleLoanChange}
                                 required
                                 onBlur={() => handleIdBlur(newLoan.borrowerId)}
@@ -746,7 +763,7 @@ export default function Loans() {
                             <Form.Control
                                 type="text"
                                 name="amount"
-                                value={newLoan.amount}
+                                value={newLoan.amount ?? ""}
                                 onChange={handleAmountChange}
                                 required
                             />
@@ -771,7 +788,7 @@ export default function Loans() {
                             <Form.Label>סוג החזר</Form.Label>
                             <Form.Select
                                 name="repaymentType"
-                                value={newLoan.repaymentType}
+                                value={newLoan.repaymentType ?? ""}
                                 onChange={handleLoanChange}
                             >
                                 <option value="monthly">חודשי</option>
@@ -785,7 +802,7 @@ export default function Loans() {
                                 <Form.Control
                                     type="number"
                                     name="repaymentDay"
-                                    value={newLoan.repaymentDay}
+                                    value={newLoan.repaymentDay ?? ""}
                                     onChange={handleLoanChange}
                                     min="1"
                                     max="31"
@@ -798,7 +815,7 @@ export default function Loans() {
                                 <Form.Control
                                     type="number"
                                     name="amountInMonth"
-                                    value={newLoan.amountInMonth}
+                                    value={newLoan.amountInMonth ?? ""}
                                     onChange={handleLoanChange}
                                 />
                             </Form.Group>
@@ -827,8 +844,12 @@ export default function Loans() {
                                     <div className="d-flex align-items-center justify-content-between">
                                         <span>קובץ קיים</span>
                                         <div>
-                                            <Button onClick={() => setShowModal(true)} className="btn btn-secondary btn-sm">הצג קובץ</Button>
-                                            <FaTrash
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() => openModal(newLoan.documentPath)}
+                                            >
+                                                הצג קובץ                                                                    </Button>                                            <FaTrash
                                                 type="button"
                                                 onClick={() =>
                                                     setNewLoan((prev) => ({
@@ -843,7 +864,7 @@ export default function Loans() {
                                     <DocumentModal
                                         show={showModal}
                                         onClose={() => setShowModal(false)}
-                                        pdfUrl={`http://localhost:4000/${newLoan.documentPath}?token=${token}`}
+                                        pdfUrl={`http://localhost:4000/uploads/${newLoan.documentPath}?token=${token}`}
                                     />
                                     <Form.Label className="mt-2">החלף קובץ:</Form.Label>
                                     <Form.Control
@@ -911,7 +932,7 @@ export default function Loans() {
                             <Form.Control
                                 type="text"
                                 name="notes"
-                                value={newLoan.notes}
+                                value={newLoan.notes ?? ""}
                                 onChange={handleLoanChange}
                             />
                         </Form.Group>
@@ -947,13 +968,14 @@ export default function Loans() {
                                             <div className="mb-2">
                                                 <div>
                                                     <span>קובץ קיים: </span>
-                                                    <div>
-                                                        <Button class="btn btn-secondary" onClick={() => setShowModal(true)}>הצג קובץ</Button>
-                                                        <DocumentModal show={showModal} onClose={() => setShowModal(false)} pdfUrl={`http://localhost:4000/${g.documentPath}?token=${token}`} />
-                                                    </div>
                                                     <Button
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        onClick={() => openModal(g.documentPath)}
+                                                    >
+                                                        הצג קובץ                                                                    </Button>
+                                                    <FaTrash
                                                         type="button"
-                                                        className="btn btn-outline-danger btn-sm ms-2"
                                                         onClick={() => {
                                                             const updated = [...newLoan.guarantors];
                                                             updated[index] = {
@@ -963,9 +985,7 @@ export default function Loans() {
                                                             };
                                                             setNewLoan({ ...newLoan, guarantors: updated });
                                                         }}
-                                                    >
-                                                        <i className="bi bi-trash"></i>
-                                                    </Button>
+                                                    />
                                                 </div>
                                                 <Form.Label className="mt-2">החלף קובץ:</Form.Label>
                                                 <Form.Control

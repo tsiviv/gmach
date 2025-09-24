@@ -4,7 +4,9 @@ import { FaSyncAlt, FaBell, FaClock, FaEdit } from 'react-icons/fa';
 import TooltipWrapper from './TooltipWrapper';
 import '../styles/Header.css';
 import { updateLoanStatusApi } from '../servieces/Loans';
-import { updateSiteTitle, uploadLogo, getSiteDetails } from '../servieces/Login'
+import { updateSiteTitle, uploadLogo, getSiteDetails } from '../servieces/Login';
+import DocumentModal from './DocumentModel';
+import { Modal, Button, Form } from "react-bootstrap";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -14,13 +16,43 @@ export default function Header() {
   const [hoverTitle, setHoverTitle] = useState(false);
   const [titleChange, setTitleChange] = useState(false);
   const fileInputRef = useRef(null);
-  const [siteTitle, setSiteTitle] = useState(sessionStorage.getItem('siteTitle') || "hi");
-  const [logoUrl, setLogoUrl] = useState(`http://localhost:4000/uploads/logo.png?token=${sessionStorage.getItem('token')}`);
+  const [siteTitle, setSiteTitle] = useState("ניהול גמח"); // ערך התחלתי
+  const [logoError, setLogoError] = useState(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
-    const siteTitle = sessionStorage.getItem("siteTitle") || "ניהול גמח";
     document.title = siteTitle;
-  }, [titleChange]);
+  }, [siteTitle]);
+
+  // קריאה לשרת כדי להביא את שם האתר
+  useEffect(() => {
+
+    const fetchDetails = async () => {
+      try {
+        const data = await getSiteDetails();
+        if (data.name) {
+          setSiteTitle(data.name); // מעדכן את ה-state בלבד
+          localStorage.setItem("siteTitle",data.name)
+        }
+      } catch (error) {
+        console.error('שגיאה בקבלת פרטי האתר:', error);
+      }
+    };
+
+    fetchDetails();
+  }, [token]);
+
+  const saveTitle = async () => {
+    setEditingTitle(false);
+    try {
+      await updateSiteTitle(siteTitle);
+      setSiteTitle(siteTitle); // מעדכן את ה-state בלבד
+    } catch (err) {
+      if (err.response?.status === 403 || err.response?.status === 401) {
+        alert("יש להתחבר לפני שינוי שם הגמח")
+      }
+    }
+  };
 
   useEffect(() => {
     const onStorageChange = () => {
@@ -32,27 +64,6 @@ export default function Header() {
     return () => window.removeEventListener("storage", onStorageChange);
   }, []);
 
-
-  useEffect(() => {
-    if (!token) return;
-
-    const fetchDetails = async () => {
-      try {
-        const data = await getSiteDetails();
-        if (data.name) {
-          setSiteTitle(data.name);
-          sessionStorage.setItem('siteTitle', data.name);
-        }
-        if (data.logo) {
-          setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}`);
-        }
-      } catch (error) {
-        console.error('שגיאה בקבלת פרטי האתר:', error);
-      }
-    };
-
-    fetchDetails();
-  }, [token]); // יפעל רק כשהtoken נטען
 
 
   const logout = () => {
@@ -79,22 +90,12 @@ export default function Header() {
 
     try {
       await uploadLogo(file, siteTitle);
-      const data = await getSiteDetails();
-      setLogoUrl(`http://localhost:4000/uploads/logo.png?token=${token}&t=${Date.now()}`);
-      sessionStorage.setItem('logoUrl', data.logo);
-    } catch (error) {
-      console.error('שגיאה בהעלאת לוגו:', error);
-    }
-  };
-
-  const saveTitle = async () => {
-    setEditingTitle(false);
-    try {
-      await updateSiteTitle(siteTitle);
-      sessionStorage.setItem('siteTitle', siteTitle);
-      setTitleChange(titleChange ? false : true)
-    } catch (e) {
-      console.error('שגיאה בעדכון השם:', e);
+      setTitleChange(titleChange ? false : true);
+      setLogoError(null); // נקה שגיאה קודמת אם הצליח
+    } catch (err) {
+      if (err.response?.status === 403 || err.response?.status === 401) {
+        alert("יש להתחבר לפני שינוי הלוגו")
+      }
     }
   };
 
@@ -104,13 +105,19 @@ export default function Header() {
       <div className="name fw-bold fs-2 w-50 d-flex align-items-center gap-2">
 
         <div
-          onMouseEnter={() => setHoverLogo(true)}
+          onMouseEnter={() => token && setHoverLogo(true)}
           onMouseLeave={() => setHoverLogo(false)}
-          style={{ position: 'relative', cursor: 'pointer', marginLeft: "30px" }}
-          onClick={handleLogoClick}
+          style={{
+            position: 'relative',
+            cursor: token ? 'pointer' : 'default',
+            opacity: token ? 1 : 0.5,
+            marginLeft: "30px"
+          }}
+          onClick={() => token && handleLogoClick()}
         >
+
           <img
-            src={logoUrl}
+            src={`http://localhost:4000/uploads/logo.png?token=${token}&change=${titleChange}`}
             alt="logo"
             style={{ height: '70px', width: '70px', objectFit: 'contain' }}
           />
@@ -152,7 +159,10 @@ export default function Header() {
               className="form-control form-control-sm"
             />
           ) : (
-            <span onClick={() => setEditingTitle(true)} style={{ cursor: 'pointer' }}>
+            <span
+              onClick={() => token && setEditingTitle(true)}
+              style={{ cursor: token ? 'pointer' : 'default', opacity: token ? 1 : 0.5 }}
+            >
               {siteTitle}
               {hoverTitle && (
                 <FaEdit style={{ marginRight: 5, fontSize: '0.8rem', color: '#007bff' }} />
@@ -199,6 +209,20 @@ export default function Header() {
         </TooltipWrapper>
 
       </div>
+      <Modal show={showErrorModal} onHide={() => setShowErrorModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>שגיאה בהעלאת הלוגו</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {logoError}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowErrorModal(false)}>
+            סגור
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
     </header>
   );
 }

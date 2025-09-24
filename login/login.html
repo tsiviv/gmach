@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>כניסה</title>
+  <style>
+    body {
+      font-family: Arial;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    input { margin: 10px; padding: 5px; width: 200px; }
+    button { padding: 5px 10px; }
+    p { color: red; }
+  </style>
+</head>
+<body>
+  <h2>הכנס סיסמה</h2>
+  <input id="password" type="password" placeholder="סיסמה" />
+  <button id="submitBtn">כניסה</button>
+  <p id="errorMsg"></p>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const btn = document.getElementById('submitBtn');
+    const passwordInput = document.getElementById('password');
+    const errorMsg = document.getElementById('errorMsg');
+
+    btn.addEventListener('click', () => {
+      const pass = passwordInput.value.trim();
+      if (!pass) {
+        errorMsg.textContent = 'אנא הכנס סיסמה';
+        return;
+      }
+      ipcRenderer.send('submit-password', pass);
+      errorMsg.textContent = 'מנסה להתחבר...'; // הודעה זמנית
+    });
+
+    ipcRenderer.on('password-error', (event, msg) => {
+      errorMsg.textContent = msg;
+    });
+  </script>
+</body>
+</html>
