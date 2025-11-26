@@ -11,6 +11,7 @@ export const Notification = () => {
     const [overdueLoans, setOverdueLoans] = useState([]);
     const [MonthlyChecks, setMonthlyChecks] = useState([]);
     const navigate = useNavigate();
+    const [sendingEmail, setSendingEmail] = useState(false);
 
     const countAmountLeft = (loan) => {
         let total = loan.amount
@@ -46,10 +47,11 @@ export const Notification = () => {
     const handleChange = async (e) => {
         const newStatus = e.target.checked;
         setEnabled(newStatus);
-        await setNotificationsStatus(newStatus);
+        await setNotificationsStatus();
     };
     const sendemail = async () => {
         try {
+            setSendingEmail(true);
             const status = await sendEmail();
             alert(status)
         } catch (err) {
@@ -58,6 +60,9 @@ export const Notification = () => {
             }
             console.log(err.response.data.message)
             alert("שגיאה בשליחת מייל");
+        }
+        finally {
+            setSendingEmail(false);
         }
     }
     function translaterepaymentType(repaymentType) {
@@ -95,7 +100,9 @@ export const Notification = () => {
                 <input type="checkbox" checked={enabled} onChange={handleChange} />
                 <span>{enabled ? 'פעיל' : 'לא פעיל'}</span>
             </label>
-            <button onClick={sendemail}>שלח לי למייל עכשיו את כל ההלוואת שלא שולמו</button>
+            <button onClick={sendemail} disabled={sendingEmail}>
+                {sendingEmail ? 'שולח...' : 'שלח לי למייל עכשיו את כל ההלוואות שלא שולמו'}
+            </button>
             <hr style={{ margin: '1rem 0' }} />
             <h4>הלוואות שלא שולמו:</h4>
             {overdueLoans.length === 0 ? (

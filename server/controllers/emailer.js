@@ -93,7 +93,7 @@ function generateEmailHTML(loans) {
                     <th>סוג החזר</th>
                     <th>סכום החזר חודשי</th>
                     <th>תאריך החזר</th>
-                    <th>מספר תשלומים</th>
+                    <th>בכמה תשלומים</th>
                     <th>מספר אחורים</th>
                 </tr>
             </thead>
@@ -112,7 +112,7 @@ function generateEmailHTML(loans) {
                 <td>${loan.repaymentType === 'monthly' ? 'חודשי' : 'חד פעמי'}</td>
                 <td>${loan.repaymentType === 'monthly' ? loan.amountInMonth : '-'}</td>
                 <td>${loan.repaymentType === 'monthly' ? loan.repaymentDay + " לחודש" : new Date(loan.startDate).toLocaleDateString('he-IL')}</td>
-                <td>${loan.repayments?.length || 0}</td>
+                <td>${loan.amountOfPament}</td>
                 <td>${loan.lateCount}</td>
             </tr>
         `;

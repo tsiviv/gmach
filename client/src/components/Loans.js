@@ -52,7 +52,7 @@ export default function Loans() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(50); // מספר רשומות לדף
-    const filteredLonas = loans.filter((loan) => {
+    const filteredLonas = loans?.filter((loan) => {
         if (!selectedFilter) return true;
 
         if (selectedFilter === 'borrowerId') {
@@ -106,12 +106,15 @@ export default function Loans() {
         }));
     };
     const countAmountLeft = (loan) => {
+        console.log("loan",loan)
         let total = loan.amount
-        loan.repayments?.forEach(element => {
+        loan.repayments.forEach(element => {
+            console.log("element",element)
             total -= element.amount
         });
         return total
     }
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending':
@@ -147,7 +150,6 @@ export default function Loans() {
         try {
             const res = await GetLoanById(id);
             setloansMan(res);
-            setOpenLoanId(openLoanId === id ? null : id)
         } catch (err) {
             if (err.response?.status === 403 || err.response?.status === 401) {
                 navigate('../')
@@ -161,6 +163,7 @@ export default function Loans() {
     async function fetchData() {
         try {
             const allLoans = await GetAllLoans(currentPage, pageSize);
+            console.log(allLoans)
             setLoans(allLoans.data);
             setTotalPages(allLoans.totalPages);
             console.log(allLoans)
@@ -568,7 +571,7 @@ export default function Loans() {
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredLonas.map((loanMap) => (
+                    {filteredLonas?.map((loanMap) => (
                         <React.Fragment key={loanMap.id}>
                             <tr>
                                 <td>
@@ -627,43 +630,43 @@ export default function Loans() {
                                     <td colSpan="10" className="bg-light">
                                         <ul className="mt-3">
 
-                                            <li key={loansMan.id} className="mb-2">
+                                            <li key={loansMan?.id} className="mb-2">
                                                 <strong>הלוואה #{loansMan.id}</strong><br />
                                                 <Button onClick={() => handleShowPdf(loansMan)}>
                                                     {pdfVisible ? 'סגור דוח' : 'הצג דוח'}
                                                 </Button>
                                                 <div id="pdf-container" className="mt-4"></div>
-                                                {loanMap.repaymentType === "monthly" ? (
+                                                {loansMan.repaymentType === "monthly" ? (
                                                     <>
-                                                        💵 סכום התחלתי: {formatAmount(loanMap.amount, loanMap.currency)}<br />
-                                                        📆 סכום לחודש: {formatAmount(loanMap.amountInMonth, loanMap.currency) ?? 'לא זמין'}<br />
-                                                        📊 כמות תשלומים: {loanMap.amountOfPament ?? 'לא זמין'}<br />
-                                                        📅 יום בחודש: {loanMap.repaymentDay ?? 'לא צוין'}<br />
+                                                        💵 סכום התחלתי: {formatAmount(loansMan.amount, loansMan.currency)}<br />
+                                                        📆 סכום לחודש: {formatAmount(loansMan.amountInMonth, loansMan.currency) ?? 'לא זמין'}<br />
+                                                        📊 כמות תשלומים: {loansMan.amountOfPament ?? 'לא זמין'}<br />
+                                                        📅 יום בחודש: {loansMan.repaymentDay ?? 'לא צוין'}<br />
                                                     </>
                                                 ) : (
                                                     <>
-                                                        💵 סכום: {formatAmount(loanMap.amount, loanMap.currency)}<br />
-                                                        📅 תאריך החזר: {formatDateToReadable(loanMap.singleRepaymentDate) || "—"}<br />
+                                                        💵 סכום: {formatAmount(loansMan.amount, loansMan.currency)}<br />
+                                                        📅 תאריך החזר: {formatDateToReadable(loansMan.singleRepaymentDate) || "—"}<br />
                                                     </>
                                                 )}
-                                                📉 יתרה: {countAmountLeft(loanMap)}<br />
-                                                תאריך התחלה: {formatDateToReadable(loanMap.startDate) || "—"}<br />
-                                                כמות איחורים: {loanMap.lateCount}<br />
+                                                📉 יתרה: {countAmountLeft(loansMan)}<br />
+                                                תאריך התחלה: {formatDateToReadable(loansMan.startDate) || "—"}<br />
+                                                כמות איחורים: {loansMan.lateCount}<br />
                                                 <span style={{
                                                     color: 'white',
-                                                    backgroundColor: getStatusColor(loansMan.status),
+                                                    backgroundColor: getStatusColor(loansMan?.status),
                                                     padding: '3px 8px',
                                                     borderRadius: '8px',
                                                     fontWeight: 'bold',
                                                     display: 'inline-block',
                                                     marginTop: '4px'
                                                 }}>
-                                                    {translateLoanStatus(loansMan.status)}
+                                                    {translateLoanStatus(loansMan?.status)}
                                                 </span>
 
-                                                {openLoanId === loansMan.id && loansMan.guarantors && loansMan.guarantors.length > 0 && (
+                                                {openLoanId === loansMan?.id && loansMan?.guarantors && loansMan?.guarantors.length > 0 && (
                                                     <ul style={{ marginTop: "0.5em" }}>
-                                                        {loansMan.guarantors.map((g, idx) => (
+                                                        {loansMan?.guarantors.map((g, idx) => (
                                                             <li key={idx}>
                                                                 שם ערב: {g.guarantor?.fullName || "לא זמין"}
                                                                 {g.documentPath && (
@@ -682,7 +685,7 @@ export default function Loans() {
                                                 )}
                                                 <div className="mt-3">
                                                     <strong style={{ display: "block", marginBottom: "4px" }}>תשלומים:</strong>
-                                                    {loansMan.repayments?.length ? (
+                                                    {loansMan?.repayments?.length ? (
                                                         <Table striped bordered size="sm">
                                                             <thead>
                                                                 <tr>
@@ -693,7 +696,7 @@ export default function Loans() {
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {loansMan.repayments.map((r, index) => (
+                                                                {loansMan?.repayments.map((r, index) => (
                                                                     <tr key={index}>
                                                                         <td>{formatAmount(r.amount, r.currency)}</td>
                                                                         <td>{formatDate(r.paidDate)}</td>

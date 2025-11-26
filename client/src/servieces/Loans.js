@@ -21,6 +21,8 @@ export const GetAllLoans = async (page = 1, limit = 20) => {
     const res = await api.get('/Loan', {
       params: { page, limit }
     });
+
+    console.log(res)
     return res.data; // יכיל: data, total, totalPages, currentPage
   } catch (error) {
     console.error('Error fetching all loans:', error);

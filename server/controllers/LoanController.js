@@ -197,16 +197,14 @@ const controller = {
             const offset = (page - 1) * limit;
 
             const { count, rows } = await Loan.findAndCountAll({
-                include: [
-                    {
-                        model: People,
-                        as: 'borrower'
-                    },
-                ],
-                offset,
-                limit,
-                order: [['startDate', 'DESC']] // אפשר לשנות לפי הצורך
-            });
+  include: [{ model: People, as: 'borrower' }],
+  offset,
+  limit,
+  order: [['startDate', 'DESC']],
+  raw: true,
+  nest: true
+});
+
 
             res.json({
                 data: rows,

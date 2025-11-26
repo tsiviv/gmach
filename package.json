@@ -22,6 +22,7 @@
     "multer": "^2.0.0",
     "node-cron": "^4.0.6",
     "nodemailer": "^7.0.5",
+    "os": "^0.1.2",
     "sequelize": "^6.37.7",
     "sharp": "^0.34.3",
     "sqlite3": "^5.1.7"
@@ -39,7 +40,10 @@
     "files": [
       "client/build/**/*",
       "server/**/*",
+      "server/models/data/gmach.sqlite",
+      "server/models/data/gmach.sqlite.enc",
       "main.js",
+      "preload.js",
       "package.json",
       "uploads/**/*"
     ],

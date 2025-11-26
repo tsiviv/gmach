@@ -130,6 +130,24 @@ const openModal = (path) => {
         }
     };
 
+        function formatDateToReadable(dateString) {
+        const date = new Date(dateString);
+
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+
+        return `${day}/${month}/${year} `;
+    }  
+      function formatDateToReadable(dateString) {
+        const date = new Date(dateString);
+
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+
+        return `${day}/${month}/${year} `;
+    }
     const showLoans = async (id) => {
         try {
             const res = await GetLoansByPerson(id);
@@ -287,12 +305,22 @@ const openModal = (path) => {
 
                                                     <strong>הלוואה #{loan.id}</strong><br />
 
-                                                    💵 סכום התחלתי: {formatAmount(loan.amount, loan.currency)}<br />
-                                                    📉 יתרה: {formatAmount(countAmountLeft(loan), loan.currency)}<br />
-                                                    📆 סכום לחודש: {formatAmount(loan.amountInMonth, loan.currency) ?? 'לא זמין'}<br />
-                                                    📅 יום בחודש: {loan.repaymentDay ?? 'לא צוין'}<br />
-                                                    📊 כמות תשלומים: {loan.amountOfPament ?? 'לא זמין'}<br />
-                                                    כמות איחורים להלוואה זו: {loan.lateCount}<br />
+                                                  {loan.repaymentType === "monthly" ? (
+                                                                                                      <>
+                                                                                                          💵 סכום התחלתי: {formatAmount(loan.amount, loan.currency)}<br />
+                                                                                                          📆 סכום לחודש: {formatAmount(loan.amountInMonth, loan.currency) ?? 'לא זמין'}<br />
+                                                                                                          📊 כמות תשלומים: {loan.amountOfPament ?? 'לא זמין'}<br />
+                                                                                                          📅 יום בחודש: {loan.repaymentDay ?? 'לא צוין'}<br />
+                                                                                                      </>
+                                                                                                  ) : (
+                                                                                                      <>
+                                                                                                          💵 סכום: {formatAmount(loan.amount, loan.currency)}<br />
+                                                                                                          📅 תאריך החזר: {formatDateToReadable(loan.singleRepaymentDate) || "—"}<br />
+                                                                                                      </>
+                                                                                                  )}
+                                                                                                  📉 יתרה: {countAmountLeft(loan)}<br />
+                                                                                                  תאריך התחלה: {formatDateToReadable(loan.startDate) || "—"}<br />
+                                                                                                  כמות איחורים: {loan.lateCount}<br />
                                                     {loan.documentPath ? <div>
                                         <Button variant="dark" onClick={() => openModal(loan.documentPath)}>
                                             שטר חוב

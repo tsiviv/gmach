@@ -1,17 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const settings = require('../middleware/globalSettings');
+const Login = require('../controllers/Login');
 
 // POST: עדכון מצב ההתראות
-router.post('/set-notifications', (req, res) => {
-  const { enabled } = req.body;
-  settings.set(enabled);
-  res.json({ success: true });
-});
+router.post('/set-notifications', Login.toggleNotifications);
 
 // GET: קבלת מצב ההתראות הנוכחי
-router.get('/get-notifications', (req, res) => {
-  res.json({ enabled: settings.get() });
-});
+
+router.get('/get-notifications', Login.getSettings);
 
 module.exports = router;

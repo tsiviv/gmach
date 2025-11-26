@@ -8,7 +8,6 @@ module.exports = async function startServer(expressApp, userDataPath) {
     const app = expressApp;
     const cron = require('node-cron');
     const cors = require('cors');
-    const gracefulShutdown = require('./models/endActions'); // ודא שהפונקציה ב־endActions יודעת לקבל פרמטר reason
     const LoanRoute = require('./routes/LoanRoute');
     const GuarantorRoute = require('./routes/GuarantorRoute');
     const PeopleRoute = require('./routes/PeopleRoute');
@@ -17,13 +16,13 @@ module.exports = async function startServer(expressApp, userDataPath) {
     const LoginRoute = require('./routes/LoginRoute')(app, userDataPath);
     const turnsRoute = require('./routes/turnsRoutes');
     const DepositRoute = require('./routes/DepositRoute');
+    const { gracefulShutdown } = require('./models/index')
     const notificationsRouter = require('./routes/notifications');
     const { updateLoanStatuses } = require('./controllers/LoanController');
     const { sendEmail } = require('./controllers/emailer');
     const { verifyToken } = require('./middleware/auth');
-    const { wantsNotifications } = require('./middleware/settings.json');
     require('./models/assocatiion');
-
+    const { readConfig } = require("./controllers/Login")
     // Middleware
     app.use(express.json());
     app.use(cors({ origin: "*", credentials: true }));
@@ -31,6 +30,18 @@ module.exports = async function startServer(expressApp, userDataPath) {
     app.use('/uploads', express.static(path.join(userDataPath, 'uploads')));
 
     // Shutdown handlers
+    app.on('before-quit', async (event) => {
+        event.preventDefault();
+        await gracefulShutdown('electron');
+        app.quit();
+    });
+
+    app.on('window-all-closed', async () => {
+        await gracefulShutdown('all-windows-closed');
+        if (process.platform !== 'darwin') app.quit();
+    });
+
+    // Event listeners של מערכת
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('exit', () => gracefulShutdown('exit'));
@@ -38,20 +49,22 @@ module.exports = async function startServer(expressApp, userDataPath) {
         console.error('Uncaught exception:', err);
         await gracefulShutdown('uncaughtException');
     });
-    process.on('unhandledRejection', async (reason) => {
-        console.error('Unhandled rejection:', reason);
-        await gracefulShutdown('unhandledRejection');
-    });
 
     // Cron jobs
-    cron.schedule('0 9,21 * * *', async () => {
+    cron.schedule(process.env.LOAN_STATUS_CRON, async () => {
         console.log('Running loan status update...');
         await updateLoanStatuses();
     });
 
-    cron.schedule('0 22 * * 6', async () => {
-        console.log('Running email...');
-        if (wantsNotifications) await sendEmail();
+    cron.schedule(process.env.EMAIL_CRON, async () => {
+        console.log('Running email...', new Date());
+        if (readConfig().wantsNotifications) {
+            try {
+                await sendEmail();
+            } catch (err) {
+                console.error('Error sending email:', err);
+            }
+        }
     });
 
     // Routes

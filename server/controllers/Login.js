@@ -55,7 +55,7 @@ const writeConfig = (config) => {
 
 module.exports = {
   setUserDataPath,
-
+readConfig,
   login: async (req, res) => {
     const { email, password } = req.body;
     const validEmail = process.env.ENAIL_ADMIN;
@@ -74,6 +74,7 @@ module.exports = {
     res.json({
       name: config.name || '',
       logo: config.logo || '',
+      wantsNotifications: config.wantsNotifications || false,
       userDataPath: config.userDataPath || ''
     });
   },
@@ -105,5 +106,17 @@ module.exports = {
     config.name = gamachName;
     writeConfig(config);
     res.json({ message: 'השם נשמר בהצלחה', config });
-  }
+  },
+  toggleNotifications: async (req, res) => {
+  const config = readConfig();
+
+  config.wantsNotifications = !config.wantsNotifications;
+
+  writeConfig(config);
+  res.json({
+    message: `wantsNotifications עודכן ל-${config.wantsNotifications}`,
+    config
+  });
+},
+
 };

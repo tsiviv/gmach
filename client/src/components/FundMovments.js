@@ -44,6 +44,7 @@ export default function FundMovementsPage({ isAdmin }) {
     const [fromDate, setFromDate] = useState('');
     const [minAmount, setMinAmount] = useState('');
     const [maxAmount, setMaxAmount] = useState('');
+    const [type,setType]=useState()
     const filteredmovements = movements.filter((movement) => {
         if (!selectedFilter) return true;
         if (selectedFilter === 'borrowerId') {
@@ -64,7 +65,10 @@ export default function FundMovementsPage({ isAdmin }) {
             if (!fromDate) return true;
             return movement.date === fromDate;
         }
-
+if (selectedFilter === 'type') {
+            if (!type) return true;
+            return movement.type === type;
+        }
         if (selectedFilter === 'amount') {
             const amount = Number(movement.amount);
             const min = Number(minAmount) || 0;
@@ -340,6 +344,7 @@ export default function FundMovementsPage({ isAdmin }) {
                                 >
                                     <option value="">-- אין סינון --</option>
                                     <option value="borrowerId">תעודת זהות</option>
+                                                                        <option value="type">סוג תנועה</option>
                                     <option value="name">שם</option> {/* הוספתי כאן */}
                                     <option value="amount">טווח סכום תשלום</option>
                                     <option value="dateRange">טווח תאריכים</option>
@@ -377,6 +382,26 @@ export default function FundMovementsPage({ isAdmin }) {
                                         onChange={(e) => { setFilterValue(e.target.value); closePdfIfOpen() }}
                                         placeholder={'לדוגמה: 123456789'}
                                     />
+                                </div>
+                            ) : null}
+
+                            {selectedFilter === 'type' ? (
+                                <div className="col">
+                                    <Form.Label>בחר:</Form.Label>
+                                <Form.Select
+                                    value={type}
+                                    onChange={(e) => {
+                                        setType(e.target.value);
+                                    }}
+                                >
+                                    <option value="">-- אין סינון --</option>
+                                                                        <option value="repayment_received">תשלומי הלוואות</option>
+                                    <option value="manual_adjustment">הפקדות מנהל</option>
+                                                                        <option value="donation">תרומות</option>
+                                    <option value="deposit_pull">משיכות</option> {/* הוספתי כאן */}
+                                    <option value="deposit">הפקדות</option>
+                                    <option value="loan_given">הלוואות</option>
+                                </Form.Select>
                                 </div>
                             ) : null}
 

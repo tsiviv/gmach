@@ -6,8 +6,8 @@ const startServer = require('./server/api');
 const { app, BrowserWindow, ipcMain } = require('electron');
 
 let logFile; // נגדיר מאוחר יותר אחרי שה-app מוכן
-let gracefulShutdown;
-let splashWindow; 
+let splashWindow;
+let userDataPath;
 
 function log(message) {
   if (!logFile) return; // אם עדיין אין נתיב לוג, לא נרשום
@@ -93,24 +93,34 @@ function showErrorWindow(message) {
 let serverInstance;
 async function startServerInstance() {
   const expressApp = express();
-  const userDataPath = app.getPath('userData'); // כאן זה בטוח
+  userDataPath = app.getPath('userData'); // כאן זה בטוח
   serverInstance = await startServer(expressApp, userDataPath);
   log('✅ Server started successfully');
 }
 
 
 function createMainWindow() {
+  const { screen, BrowserWindow } = require('electron');
+  const path = require('path');
+
+  // מקבל את המסך הראשי
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize; // רק האזור שניתן להשתמש בו
+
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width,
+    height,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
   });
 
+  // ממקם ומגדיר את החלון לגודל המסך
+  win.setBounds({ x: 0, y: 0, width, height });
+
   const indexPath = path.join(__dirname, 'client', 'build', 'index.html');
+
   if (!fs.existsSync(indexPath)) {
     const errMsg = `❌ Build of React not found at ${indexPath}`;
     log(errMsg);
@@ -122,25 +132,23 @@ function createMainWindow() {
   log('✅ Main window loaded');
 
   // סגירת הספלאש כשהחלון נטען והשרת מוכן
-    win.webContents.once('did-finish-load', async () => {
-
+  win.webContents.once('did-finish-load', async () => {
     if (splashWindow) {
       splashWindow.close();
       splashWindow = null;
     }
   });
+
+  return win; // אם צריך להחזיר את החלון
 }
-
-
-
 
 app.whenReady().then(async () => {
   logFile = path.join(app.getPath('userData'), 'electron.log');
-  createSplashWindow(); 
+  createSplashWindow();
 
   try {
-    loadEncryptedEnv(); 
-    gracefulShutdown = require('./server/models/endActions');
+    loadEncryptedEnv();
+    userDataPath = app.getPath('userData'); 
     log('✔️ Environment loaded successfully');
   } catch (err) {
     logError(err);
@@ -155,33 +163,6 @@ app.whenReady().then(async () => {
     logError(err);
     showErrorWindow(err.stack || err);
   }
-});
-
-// ----------- סגירה מסודרת ----------
-app.on('before-quit', async (event) => {
-  event.preventDefault();
-  try {
-    if (serverInstance) serverInstance.close();
-    await gracefulShutdown();
-    log('⚠️ App shutting down gracefully');
-  } catch (err) {
-    logError(err);
-  } finally {
-    app.exit(0);
-  }
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-
-// ----------- טיפול בשגיאות מערכתיות ----------
-process.on('SIGINT', async () => await gracefulShutdown());
-process.on('SIGTERM', async () => await gracefulShutdown());
-process.on('uncaughtException', async (err) => {
-  logError(err);
-  showErrorWindow(err.stack || err);
-  await gracefulShutdown();
 });
 
 ipcMain.handle('get-user-data-path', () => {

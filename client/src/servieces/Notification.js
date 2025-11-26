@@ -23,7 +23,7 @@ api.interceptors.request.use(
 export const getNotificationsStatus = async () => {
   try {
     const res = await api.get('/Notification/get-notifications');
-    return res.data.enabled;
+    return res.data.wantsNotifications;
   } catch (error) {
     console.error('שגיאה בקבלת סטטוס התראות:', error);
     throw error;
@@ -31,9 +31,9 @@ export const getNotificationsStatus = async () => {
 };
 
 // עדכון סטטוס ההתראות
-export const setNotificationsStatus = async (enabled) => {
+export const setNotificationsStatus = async () => {
   try {
-    const res = await api.post('/Notification/set-notifications', { enabled });
+    const res = await api.post('/Notification/set-notifications',{});
     return res.data;
   } catch (error) {
     console.error('שגיאה בעדכון סטטוס התראות:', error);
