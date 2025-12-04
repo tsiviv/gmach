@@ -21,8 +21,9 @@ module.exports = async function startServer(expressApp, userDataPath) {
     const { updateLoanStatuses } = require('./controllers/LoanController');
     const { sendEmail } = require('./controllers/emailer');
     const { verifyToken } = require('./middleware/auth');
-    require('./models/assocatiion');
     const { readConfig } = require("./controllers/Login")
+    require('./models/assocatiion');
+
     // Middleware
     app.use(express.json());
     app.use(cors({ origin: "*", credentials: true }));
@@ -41,7 +42,6 @@ module.exports = async function startServer(expressApp, userDataPath) {
         if (process.platform !== 'darwin') app.quit();
     });
 
-    // Event listeners של מערכת
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('exit', () => gracefulShutdown('exit'));
@@ -50,7 +50,6 @@ module.exports = async function startServer(expressApp, userDataPath) {
         await gracefulShutdown('uncaughtException');
     });
 
-    // Cron jobs
     cron.schedule(process.env.LOAN_STATUS_CRON, async () => {
         console.log('Running loan status update...');
         await updateLoanStatuses();

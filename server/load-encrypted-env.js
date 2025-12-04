@@ -11,7 +11,21 @@ function loadEncryptedEnv(callback) {
     }
 
     try {
-        const fileBuffer = fs.readFileSync(path.join(__dirname, 'env.enc'));
+        // 🔥 חשוב: ב-production הקובץ נמצא מחוץ ל-ASAR
+        const envPath =
+            process.env.NODE_ENV === "development"
+                ? path.join(__dirname, "env.enc")  // בפיתוח
+                : path.join(process.resourcesPath, "env.enc"); // לאחר אריזה
+
+        if (!fs.existsSync(envPath)) {
+            throw new Error("קובץ env.enc לא נמצא בנתיב: " + envPath);
+        }
+
+        const fileBuffer = fs.readFileSync(envPath);
+        if (fileBuffer.length < 17) {
+            throw new Error("קובץ env.enc פגום או ריק");
+        }
+
         const iv = fileBuffer.slice(0, 16);
         const encrypted = fileBuffer.slice(16);
 
@@ -20,11 +34,11 @@ function loadEncryptedEnv(callback) {
         const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
         const config = JSON.parse(decrypted.toString());
-        for (let key in config) {
-            process.env[key] = config[key];
+        for (let keyName in config) {
+            process.env[keyName] = config[keyName];
         }
 
-        console.log('✔️ הסביבה נטענה בהצלחה מהקובץ המוצפן');
+        console.log('✔️ הסביבה נטענה בהצלחה מהקובץ המוצפן:', envPath);
 
         if (callback) callback();
 

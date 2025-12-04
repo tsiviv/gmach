@@ -88,7 +88,6 @@ async function gracefulShutdown(reason = 'electron') {
   }
 
   try {
-    // הצפנה מחדש של temp ל-encryptedPath
     if (fs.existsSync(tempPath)) encryptFile(tempPath, encryptedPath);
 
     const homeDir = os.homedir(); 

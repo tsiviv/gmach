@@ -37,6 +37,7 @@
     "appId": "com.gmach.desktop",
     "productName": "GmachApp",
     "electronVersion": "37.3.1",
+
     "files": [
       "client/build/**/*",
       "server/**/*",
@@ -47,26 +48,32 @@
       "package.json",
       "uploads/**/*"
     ],
+
     "extraResources": [
       {
         "from": "server/models/data/gmach.sqlite.enc",
         "to": "server/models/data/gmach.sqlite.enc"
+      },
+      {
+        "from": "server/env.enc",
+        "to": "env.enc"
       }
     ],
+
     "directories": {
       "buildResources": "assets"
     },
+
     "win": {
       "icon": "assets/icon.png",
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ]
     },
+
     "nsis": {
       "oneClick": false,
       "perMachine": true,
