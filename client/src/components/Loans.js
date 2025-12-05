@@ -29,7 +29,7 @@ export default function Loans() {
         documentPath: null,
         guarantors: []
     });
-      const [formKey, setFormKey] = useState(Date.now()); // 👈 מפתח לטופס
+    const [formKey, setFormKey] = useState(Date.now()); // 👈 מפתח לטופס
     const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('he-IL');
     const token = sessionStorage.getItem('token');
     const navigate = useNavigate();
@@ -60,6 +60,7 @@ export default function Loans() {
         }
 
         if (selectedFilter === 'name') {
+            return loan.borrower.fullName.toLowerCase().includes(filterValue);
             return loan.borrower.fullName.toLowerCase().includes(filterValue);
         }
         if (selectedFilter === 'status') {
@@ -106,10 +107,10 @@ export default function Loans() {
         }));
     };
     const countAmountLeft = (loan) => {
-        console.log("loan",loan)
+        console.log("loan", loan)
         let total = loan.amount
         loan.repayments.forEach(element => {
-            console.log("element",element)
+            console.log("element", element)
             total -= element.amount
         });
         return total
@@ -176,7 +177,7 @@ export default function Loans() {
 
     useEffect(() => {
         fetchData();
-    }, [ , currentPage]);
+    }, [, currentPage]);
 
     const handleLoanChange = (e) => {
         const { name, value } = e.target;
@@ -406,9 +407,11 @@ export default function Loans() {
             case 'check': return "צ'ק";
             case 'Standing_order': return 'הוראת קבע';
             case 'cash': return 'מזומן';
+            case 'cash': return 'מזומן';
             default: return method;
         }
     };
+
     const handlePrevPage = () => {
         if (currentPage > 1) setCurrentPage(currentPage - 1);
     };
@@ -738,7 +741,7 @@ export default function Loans() {
                     <Modal.Title>הוסף הלוואה חדשה</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <Form key={formKey} onSubmit={handleSubmit }>
+                    <Form key={formKey} onSubmit={handleSubmit}>
                         <Form.Group className="mb-3">
                             <Form.Label> מספר הלוואה</Form.Label>
                             <Form.Control

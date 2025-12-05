@@ -16,6 +16,7 @@ import Turns from './components/Turns';
 import { MonthlyChecksNotification } from './components/Remainings';
 
 function App() {
+
   return (
     <Router>
       <div className="layout" dir="rtl">
